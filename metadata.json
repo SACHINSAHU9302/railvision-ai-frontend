@@ -1,0 +1,6 @@
+{
+  "name": "RailVision AI",
+  "description": "AI Railway Navigation & Assistance System using Multi-Agent RAG",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

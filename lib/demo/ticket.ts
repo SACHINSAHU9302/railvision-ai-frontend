@@ -1,0 +1,40 @@
+import { ExtractedTicketResult } from '@/types/ticket';
+
+export const DEMO_EXTRACTED_TICKET: ExtractedTicketResult = {
+  pnrNumber: '284-9182740',
+  trainNumber: '12952',
+  trainName: 'NDLS MMCT TEJAS RAJDHANI',
+  fromStation: 'NEW DELHI',
+  fromStationCode: 'NDLS',
+  toStation: 'MUMBAI CENTRAL',
+  toStationCode: 'MMCT',
+  boardingStation: 'NEW DELHI (NDLS)',
+  boardingPlatformEstimated: 2,
+  journeyDate: '13-09-2026',
+  departureTime: '16:55 HRS',
+  arrivalTime: '08:35 HRS',
+  travelClass: '3A (AC 3 Tier)',
+  quota: 'GENERAL (GN)',
+  passengers: [
+    {
+      name: 'R. SHARMA',
+      age: 34,
+      gender: 'M',
+      coach: 'B4',
+      berthNumber: '32',
+      berthType: 'Lower',
+      status: 'CNF',
+    },
+    {
+      name: 'P. SHARMA',
+      age: 31,
+      gender: 'F',
+      coach: 'B4',
+      berthNumber: '35',
+      berthType: 'Upper',
+      status: 'CNF',
+    },
+  ],
+  rawTextPreview: 'IRCTC e-Ticketing Electronic Reservation Slip (ERS)\nPNR: 284-9182740 | Train: 12952 / TEJAS RAJDHANI\nDOJ: 13-Sep-2026 | From: NDLS To: MMCT | Class: 3A\nPass 1: R. SHARMA (34, M) - CNF/B4/32/LB\nPass 2: P. SHARMA (31, F) - CNF/B4/35/UB',
+  confidenceScore: 0.98,
+};
