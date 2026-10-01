@@ -67,3 +67,8 @@ export const DEMO_RECENT_ACTIVITIES: DashboardActivity[] = [
     link: '/complaints/cmp-101',
   },
 ];
+export const DEMO_USER = {
+  name: 'Demo User',
+  email: 'demo@railvision.ai',
+  role: 'Passenger',
+};

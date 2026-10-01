@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation'; // <-- 1. Import usePathname
 import { useTheme } from '@/hooks/use-theme';
 import { isDemoMode } from '@/lib/api/client';
 import { Search, Moon, Sun, Bell, ShieldCheck, Menu } from 'lucide-react';
@@ -15,6 +16,12 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
   const { theme, toggleTheme } = useTheme();
   const [isCommandOpen, setIsCommandOpen] = React.useState(false);
   const demoActive = isDemoMode();
+  const pathname = usePathname(); // <-- 2. Get current URL path
+
+  // <-- 3. Agar path '/admin' hai, toh yeh top header render nahi hoga
+  if (pathname.startsWith('/admin')) {
+    return null;
+  }
 
   return (
     <>
@@ -59,13 +66,15 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
 
           {/* Admin link */}
           <Link
-            href="/admin"
-            className="hidden sm:flex items-center gap-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 px-2.5 py-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            href="/Admin/login"
+            target=""
+            rel="noopener noreferrer"
+            className="hidden sm:flex items-center gap-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400"
           >
             <ShieldCheck className="w-3.5 h-3.5" />
             <span>Admin</span>
           </Link>
-
+          
           {/* Theme toggle */}
           <button
             type="button"
