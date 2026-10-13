@@ -30,12 +30,16 @@ export async function apiClient<T>(endpoint: string, options: RequestInit = {}):
       },
     });
 
-    if (!res.ok) {
-      const errorData: ApiError = await res.json().catch(() => ({
-        message: `HTTP Error ${res.status}: ${res.statusText}`,
-      }));
-      throw new Error(errorData.message || 'API request failed');
-    }
+   if (!res.ok) {
+  const errorData = await res.json().catch(() => ({}));
+
+  const message =
+    errorData.message ||
+    errorData.error ||
+    `HTTP Error ${res.status}: ${res.statusText}`;
+
+  throw new Error(message);
+}
 
     return await res.json();
   } catch (error) {
