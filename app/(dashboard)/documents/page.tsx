@@ -9,7 +9,6 @@ import { LoadingState } from '@/components/ui/loading-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
 import { BookOpen, ShieldCheck } from 'lucide-react';
-import { DocumentCategory } from '@/types/document';
 
 const CATEGORIES: { id: string; label: string }[] = [
   { id: 'all', label: 'All Documents' },
@@ -29,11 +28,17 @@ export default function DocumentsPage() {
     const matchesCategory = selectedCategory === 'all' || doc.category === selectedCategory;
     if (!matchesCategory) return false;
     if (!searchQuery) return true;
+
     const q = searchQuery.toLowerCase();
+    const circularNumber =
+      'circularNumber' in doc && typeof (doc as any).circularNumber === 'string'
+        ? (doc as any).circularNumber
+        : '';
+
     return (
       doc.title.toLowerCase().includes(q) ||
       doc.summary.toLowerCase().includes(q) ||
-      doc.circularNumber.toLowerCase().includes(q)
+      circularNumber.toLowerCase().includes(q)
     );
   });
 

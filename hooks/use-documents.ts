@@ -1,5 +1,5 @@
 'use client';
-
+import * as React from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import { RailwayDocument, DocumentFilterOptions } from '@/types/document';
 import { getDocuments, getDocumentById } from '@/lib/api/documents';
@@ -31,9 +31,10 @@ export function useDocuments(initialFilters?: DocumentFilterOptions) {
     setFilters((prev) => ({ ...prev, ...newFilters }));
   };
 
-  const getSingleDocument = async (id: string) => {
-    return getDocumentById(id);
-  };
+  const getSingleDocument = React.useCallback(
+  (id: string) => getDocumentById(id),
+  []
+);
 
   return {
     documents,

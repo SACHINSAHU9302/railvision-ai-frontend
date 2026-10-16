@@ -8,7 +8,10 @@ export interface Platform {
   hasElevator: boolean;
   hasEscalator: boolean;
   status: 'active' | 'maintenance' | 'occupied';
-  coordinates: { x: number; y: number }; // Relative position on schematic map
+  coordinates: {
+    x: number;
+    y: number;
+  };
 }
 
 export interface StationAmenitySummary {
@@ -26,7 +29,10 @@ export interface ImportantPoint {
   type: 'gate' | 'bridge' | 'ticket_counter' | 'enquiry' | 'concourse';
   locationDescription: string;
   platformNear: number;
-  coordinates: { x: number; y: number };
+  coordinates: {
+    x: number;
+    y: number;
+  };
 }
 
 export interface Station {
@@ -35,12 +41,20 @@ export interface Station {
   name: string;
   city: string;
   state: string;
+
+  // Additional backend fields
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+
   zone: string;
   category: 'A1' | 'A' | 'B';
   platformsCount: number;
+
   platforms: Platform[];
   amenities: StationAmenitySummary;
   importantPoints: ImportantPoint[];
+
   layoutDescription: string;
   helplineNumber: string;
 }
