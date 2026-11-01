@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Message } from '@/types/assistant';
+import { ChatMessage } from '@/types/assistant';
 import { CitationCard } from '@/components/assistant/citation-card';
 import { Bot, User, ThumbsUp, ThumbsDown, Copy, Check, Volume2, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';

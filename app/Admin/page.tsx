@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import {
   Building2,
   Layers,
@@ -12,53 +15,152 @@ import {
 } from "lucide-react";
 
 // =========================
-// Mock Dashboard Data
+// Dashboard Data
 // =========================
+
+type DashboardStats = {
+  total_stations: number;
+  total_platforms: number;
+  total_facilities: number;
+  total_trains: number;
+};
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
+// JWT refresh is kept in this page module; no shared api.ts file is used.
+let adminRefreshPromise: Promise<string> | null = null;
+
+function clearAdminSessionAndRedirect() {
+  sessionStorage.removeItem("adminAccessToken");
+  sessionStorage.removeItem("adminRefreshToken");
+  sessionStorage.removeItem("adminUser");
+  sessionStorage.removeItem("accessToken");
+  sessionStorage.removeItem("access");
+  window.location.replace("/Admin/Login");
+}
+
+async function refreshAdminAccessToken(): Promise<string> {
+  if (!adminRefreshPromise) {
+    adminRefreshPromise = (async () => {
+      const refresh = sessionStorage.getItem("adminRefreshToken");
+
+      if (!refresh) {
+        clearAdminSessionAndRedirect();
+        throw new Error("Admin session expired. Please log in again.");
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/auth/token/refresh/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh }),
+        cache: "no-store",
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || !data.access) {
+        clearAdminSessionAndRedirect();
+        throw new Error("Admin session expired. Please log in again.");
+      }
+
+      sessionStorage.setItem("adminAccessToken", data.access);
+      // SimpleJWT returns a rotated refresh token when ROTATE_REFRESH_TOKENS=True.
+      if (data.refresh) {
+        sessionStorage.setItem("adminRefreshToken", data.refresh);
+      }
+
+      return data.access as string;
+    })().finally(() => {
+      adminRefreshPromise = null;
+    });
+  }
+
+  return adminRefreshPromise;
+}
+
+async function adminFetch(path: string, options: RequestInit = {}) {
+  let token = sessionStorage.getItem("adminAccessToken");
+
+  if (!token) {
+    token = await refreshAdminAccessToken();
+  }
+
+  const makeRequest = (accessToken: string) => {
+    const headers = new Headers(options.headers);
+    headers.set("Authorization", `Bearer ${accessToken}`);
+    if (options.body && !headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json");
+    }
+
+    return fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers,
+      cache: "no-store",
+    });
+  };
+
+  const tokenUsedForRequest = token;
+  let response = await makeRequest(tokenUsedForRequest);
+
+  // If another parallel request already refreshed the token, reuse it.
+  if (response.status === 401) {
+    const latestToken = sessionStorage.getItem("adminAccessToken");
+    token =
+      latestToken && latestToken !== tokenUsedForRequest
+        ? latestToken
+        : await refreshAdminAccessToken();
+    response = await makeRequest(token);
+  }
+
+  return response;
+}
+
 
 const stats = [
   {
+    key: "total_stations",
     label: "Total Stations",
-    value: "13",
     icon: Building2,
     color: "text-blue-600",
     bg: "bg-blue-100",
   },
   {
+    key: "total_platforms",
     label: "Total Platforms",
-    value: "78",
     icon: Layers,
     color: "text-indigo-600",
     bg: "bg-indigo-100",
   },
   {
+    key: "total_facilities",
     label: "Total Facilities",
-    value: "342",
     icon: MapPin,
     color: "text-emerald-600",
     bg: "bg-emerald-100",
   },
   {
+    key: null,
     label: "RAG Documents",
-    value: "45",
     icon: FileText,
     color: "text-purple-600",
     bg: "bg-purple-100",
   },
   {
+    key: null,
     label: "Pending Verification",
-    value: "12",
     icon: Clock,
     color: "text-amber-500",
     bg: "bg-amber-100",
   },
   {
+    key: null,
     label: "Open Complaints",
-    value: "8",
     icon: AlertTriangle,
     color: "text-rose-600",
     bg: "bg-rose-100",
   },
-];
+] as const;
 
 const aiAgents = [
   {
@@ -81,42 +183,122 @@ const aiAgents = [
   },
 ];
 
-const recentActivity = [
-  {
-    id: 1,
-    action: "Station BPL updated",
-    user: "Admin Sachin",
-    time: "10 mins ago",
-    type: "update",
-  },
-  {
-    id: 2,
-    action: "New facility 'Waiting Room' added at RKMP",
-    user: "System Auto",
-    time: "1 hour ago",
-    type: "add",
-  },
-  {
-    id: 3,
-    action: "Uploaded Railway Rules.pdf",
-    user: "Admin Priya",
-    time: "2 hours ago",
-    type: "upload",
-  },
-  {
-    id: 4,
-    action: "New complaint received at JBP",
-    user: "Passenger Portal",
-    time: "3 hours ago",
-    type: "alert",
-  },
-];
+type RecentActivity = {
+  id: number;
+  action: string;
+  user: string;
+  type: "add" | "update" | "delete" | "upload" | "alert" | string;
+  description: string;
+  time: string;
+};
 
 // =========================
 // Admin Dashboard
 // =========================
 
 export default function AdminDashboard() {
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState("");
+
+  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [activityLoading, setActivityLoading] = useState(true);
+  const [activityError, setActivityError] = useState("");
+
+  useEffect(() => {
+    const fetchDashboardStats = async () => {
+      try {
+        const response = await adminFetch("/api/admin/dashboard/", {
+          method: "GET",
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error("Your session has expired. Please log in again.");
+          }
+          if (response.status === 403) {
+            throw new Error("Admin access is required to view these statistics.");
+          }
+          throw new Error(data.detail || data.message || "Unable to load dashboard statistics.");
+        }
+
+        if (!data.success || !data.stats) {
+          throw new Error(data.message || "Invalid dashboard response from server.");
+        }
+
+        setDashboardStats(data.stats as DashboardStats);
+        setApiError("");
+      } catch (error) {
+        setApiError(
+          error instanceof Error
+            ? error.message
+            : "Something went wrong while loading dashboard statistics."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardStats();
+  }, []);
+
+  // Fetch recent activity from Django using the admin JWT access token.
+  useEffect(() => {
+    const fetchRecentActivities = async () => {
+      try {
+        const response = await adminFetch("/api/admin/activities/", {
+          method: "GET",
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error("Your session has expired. Please log in again.");
+          }
+          if (response.status === 403) {
+            throw new Error("Admin access is required to view recent activities.");
+          }
+          throw new Error(
+            data.detail || data.message || "Unable to load recent activities."
+          );
+        }
+
+        if (!data.success || !Array.isArray(data.results)) {
+          throw new Error(data.message || "Invalid recent activities response from server.");
+        }
+
+        setRecentActivity(data.results as RecentActivity[]);
+        setActivityError("");
+      } catch (error) {
+        setActivityError(
+          error instanceof Error
+            ? error.message
+            : "Something went wrong while loading recent activities."
+        );
+      } finally {
+        setActivityLoading(false);
+      }
+    };
+
+    fetchRecentActivities();
+  }, []);
+
+  const formatActivityTime = (value: string) => {
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+
+    return date.toLocaleString("en-IN", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  };
+
   return (
     <div className="min-w-0">
       {/* =========================
@@ -131,6 +313,15 @@ export default function AdminDashboard() {
           Overview of Railway-AI system infrastructure and agent activity.
         </p>
       </div>
+
+      {apiError && (
+        <div
+          role="alert"
+          className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+        >
+          {apiError}
+        </div>
+      )}
 
       {/* =========================
           Statistics Cards
@@ -152,7 +343,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <p className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-                  {stat.value}
+                  {stat.key ? (loading ? "..." : dashboardStats?.[stat.key] ?? "—") : "—"}
                 </p>
 
                 <p className="mt-1 text-xs font-medium text-slate-500 sm:text-sm">
@@ -342,81 +533,119 @@ export default function AdminDashboard() {
             </thead>
 
             <tbody className="divide-y divide-slate-100">
-              {recentActivity.map((activity) => (
-                <tr
-                  key={activity.id}
-                  className="transition-colors hover:bg-slate-50"
-                >
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                          activity.type === "add"
-                            ? "bg-emerald-500"
-                            : activity.type === "update"
-                              ? "bg-blue-500"
-                              : activity.type === "alert"
-                                ? "bg-rose-500"
-                                : "bg-purple-500"
-                        }`}
-                      />
-
-                      <span className="font-medium text-slate-900">
-                        {activity.action}
-                      </span>
-                    </div>
-                  </td>
-
-                  <td className="px-6 py-4 text-slate-600">
-                    <div className="flex items-center gap-2">
-                      <UserCircle className="h-4 w-4 text-slate-400" />
-                      {activity.user}
-                    </div>
-                  </td>
-
-                  <td className="px-6 py-4 text-right text-slate-400">
-                    {activity.time}
+              {activityLoading ? (
+                <tr>
+                  <td colSpan={3} className="px-6 py-8 text-center text-sm text-slate-500">
+                    Loading recent activities...
                   </td>
                 </tr>
-              ))}
+              ) : activityError ? (
+                <tr>
+                  <td colSpan={3} className="px-6 py-8 text-center text-sm text-red-600">
+                    {activityError}
+                  </td>
+                </tr>
+              ) : recentActivity.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="px-6 py-8 text-center text-sm text-slate-500">
+                    No recent activities found.
+                  </td>
+                </tr>
+              ) : (
+                recentActivity.map((activity) => (
+                  <tr
+                    key={activity.id}
+                    className="transition-colors hover:bg-slate-50"
+                  >
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                            activity.type === "add"
+                              ? "bg-emerald-500"
+                              : activity.type === "update"
+                                ? "bg-blue-500"
+                                : activity.type === "alert"
+                                  ? "bg-rose-500"
+                                  : activity.type === "delete"
+                                    ? "bg-red-600"
+                                    : "bg-purple-500"
+                          }`}
+                        />
+
+                        <span className="font-medium text-slate-900">
+                          {activity.action}
+                        </span>
+                      </div>
+                    </td>
+
+                    <td className="px-6 py-4 text-slate-600">
+                      <div className="flex items-center gap-2">
+                        <UserCircle className="h-4 w-4 text-slate-400" />
+                        {activity.user}
+                      </div>
+                    </td>
+
+                    <td className="px-6 py-4 text-right text-slate-400">
+                      {formatActivityTime(activity.time)}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
 
         {/* Mobile Activity Cards */}
         <div className="divide-y divide-slate-100 md:hidden">
-          {recentActivity.map((activity) => (
-            <div
-              key={activity.id}
-              className="p-4 transition-colors hover:bg-slate-50"
-            >
-              <div className="flex items-start gap-3">
-                <span
-                  className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${
-                    activity.type === "add"
-                      ? "bg-emerald-500"
-                      : activity.type === "update"
-                        ? "bg-blue-500"
-                        : activity.type === "alert"
-                          ? "bg-rose-500"
-                          : "bg-purple-500"
-                  }`}
-                />
+          {activityLoading ? (
+            <p className="p-6 text-sm text-slate-500">
+              Loading recent activities...
+            </p>
+          ) : activityError ? (
+            <p className="p-6 text-sm text-red-600">
+              {activityError}
+            </p>
+          ) : recentActivity.length === 0 ? (
+            <p className="p-6 text-sm text-slate-500">
+              No recent activities found.
+            </p>
+          ) : (
+            recentActivity.map((activity) => (
+              <div
+                key={activity.id}
+                className="p-4 transition-colors hover:bg-slate-50"
+              >
+                <div className="flex items-start gap-3">
+                  <span
+                    className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${
+                      activity.type === "add"
+                        ? "bg-emerald-500"
+                        : activity.type === "update"
+                          ? "bg-blue-500"
+                          : activity.type === "alert"
+                            ? "bg-rose-500"
+                            : activity.type === "delete"
+                              ? "bg-red-600"
+                              : "bg-purple-500"
+                    }`}
+                  />
 
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-slate-900">
-                    {activity.action}
-                  </p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-slate-900">
+                      {activity.action}
+                    </p>
 
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                    <span>{activity.user}</span>
-                    <span>•</span>
-                    <span>{activity.time}</span>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                      <span>{activity.user}</span>
+                      <span>•</span>
+                      <span>{formatActivityTime(activity.time)}</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </section>
     </div>

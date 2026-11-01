@@ -63,11 +63,7 @@ const menuItems = [
     href: "/Admin/document-verification",
     icon: ShieldCheck,
   },
-  {
-    name: "Complaints",
-    href: "/Admin/complaints",
-    icon: AlertTriangle,
-  },
+  
   {
     name: "Users",
     href: "/Admin/users",

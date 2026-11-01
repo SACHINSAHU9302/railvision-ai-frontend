@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Plus,
   Search,
@@ -101,249 +101,14 @@ const facilityTypes = [
 ];
 
 /* =========================================================
-   DUMMY DATA
-========================================================= */
-
-const initialFacilities: Facility[] = [
-  {
-    id: 1,
-    station: "Bhopal Junction",
-    stationCode: "BPL",
-    facilityType: "Drinking Water",
-    facilityName: "Platform 1 Drinking Water",
-    platform: "Platform 1",
-    location: "Near Waiting Area",
-    latitude: "23.2699",
-    longitude: "77.4126",
-    availability: "Available",
-    accessibility: "Accessible",
-    openingTime: "00:00",
-    closingTime: "23:59",
-    description: "Drinking water facility near the main waiting area.",
-    source: "Station Survey",
-    verificationStatus: "Verified",
-    lastVerified: "2026-09-28",
-  },
-  {
-    id: 2,
-    station: "Bhopal Junction",
-    stationCode: "BPL",
-    facilityType: "Toilet",
-    facilityName: "Platform 1 General Toilet",
-    platform: "Platform 1",
-    location: "Near FOB",
-    latitude: "23.2702",
-    longitude: "77.4131",
-    availability: "Available",
-    accessibility: "Partially Accessible",
-    openingTime: "00:00",
-    closingTime: "23:59",
-    description: "General passenger toilet facility.",
-    source: "Station Survey",
-    verificationStatus: "Verified",
-    lastVerified: "2026-09-27",
-  },
-  {
-    id: 3,
-    station: "Bhopal Junction",
-    stationCode: "BPL",
-    facilityType: "Lift",
-    facilityName: "Main FOB Lift",
-    platform: "Platform 2",
-    location: "FOB Entrance",
-    latitude: "23.2705",
-    longitude: "77.4137",
-    availability: "Available",
-    accessibility: "Accessible",
-    openingTime: "05:00",
-    closingTime: "23:00",
-    description: "Passenger lift connecting platform with foot over bridge.",
-    source: "Railway Inspection",
-    verificationStatus: "Verified",
-    lastVerified: "2026-09-25",
-  },
-  {
-    id: 4,
-    station: "Rani Kamlapati",
-    stationCode: "RKMP",
-    facilityType: "Waiting Room",
-    facilityName: "General Waiting Hall",
-    platform: "Concourse",
-    location: "Main Concourse",
-    latitude: "23.2266",
-    longitude: "77.4330",
-    availability: "Available",
-    accessibility: "Accessible",
-    openingTime: "05:00",
-    closingTime: "23:30",
-    description: "General passenger waiting facility.",
-    source: "Station Survey",
-    verificationStatus: "Verified",
-    lastVerified: "2026-09-26",
-  },
-  {
-    id: 5,
-    station: "Rani Kamlapati",
-    stationCode: "RKMP",
-    facilityType: "Wi-Fi",
-    facilityName: "Station Free Wi-Fi",
-    platform: "All Platforms",
-    location: "Station Wide",
-    latitude: "23.2268",
-    longitude: "77.4335",
-    availability: "Available",
-    accessibility: "Accessible",
-    openingTime: "00:00",
-    closingTime: "23:59",
-    description: "Free passenger Wi-Fi service.",
-    source: "Station Survey",
-    verificationStatus: "Pending",
-    lastVerified: "2026-09-20",
-  },
-  {
-    id: 6,
-    station: "Indore Junction",
-    stationCode: "INDB",
-    facilityType: "Food",
-    facilityName: "Passenger Food Counter",
-    platform: "Platform 1",
-    location: "Near Main Entrance",
-    latitude: "22.7177",
-    longitude: "75.8681",
-    availability: "Available",
-    accessibility: "Accessible",
-    openingTime: "06:00",
-    closingTime: "22:00",
-    description: "Food and refreshments counter for passengers.",
-    source: "Station Survey",
-    verificationStatus: "Verified",
-    lastVerified: "2026-09-24",
-  },
-  {
-    id: 7,
-    station: "Indore Junction",
-    stationCode: "INDB",
-    facilityType: "ATM",
-    facilityName: "Passenger ATM",
-    platform: "Concourse",
-    location: "Main Concourse",
-    latitude: "22.7179",
-    longitude: "75.8685",
-    availability: "Available",
-    accessibility: "Accessible",
-    openingTime: "00:00",
-    closingTime: "23:59",
-    description: "ATM facility available inside the station.",
-    source: "Station Survey",
-    verificationStatus: "Pending",
-    lastVerified: "2026-09-21",
-  },
-  {
-    id: 8,
-    station: "Ujjain Junction",
-    stationCode: "UJN",
-    facilityType: "Help Desk",
-    facilityName: "Passenger Help Desk",
-    platform: "Concourse",
-    location: "Main Entrance",
-    latitude: "23.1765",
-    longitude: "75.7885",
-    availability: "Available",
-    accessibility: "Accessible",
-    openingTime: "06:00",
-    closingTime: "22:00",
-    description: "Passenger assistance and information desk.",
-    source: "Railway Inspection",
-    verificationStatus: "Verified",
-    lastVerified: "2026-09-23",
-  },
-  {
-    id: 9,
-    station: "Jabalpur Junction",
-    stationCode: "JBP",
-    facilityType: "Wheelchair",
-    facilityName: "Passenger Wheelchair Service",
-    platform: "Platform 1",
-    location: "Help Desk",
-    latitude: "23.1670",
-    longitude: "79.9500",
-    availability: "Available",
-    accessibility: "Accessible",
-    openingTime: "06:00",
-    closingTime: "22:00",
-    description: "Wheelchair assistance for passengers requiring mobility support.",
-    source: "Station Survey",
-    verificationStatus: "Pending",
-    lastVerified: "2026-09-18",
-  },
-  {
-    id: 10,
-    station: "Itarsi Junction",
-    stationCode: "ET",
-    facilityType: "Escalator",
-    facilityName: "Platform Escalator",
-    platform: "Platform 3",
-    location: "FOB Access",
-    latitude: "22.6120",
-    longitude: "77.7620",
-    availability: "Available",
-    accessibility: "Accessible",
-    openingTime: "05:00",
-    closingTime: "23:00",
-    description: "Escalator providing access between platform and FOB.",
-    source: "Railway Inspection",
-    verificationStatus: "Verified",
-    lastVerified: "2026-09-22",
-  },
-  {
-    id: 11,
-    station: "Satna Junction",
-    stationCode: "STA",
-    facilityType: "Parking",
-    facilityName: "Main Passenger Parking",
-    platform: "Station Area",
-    location: "Main Entrance",
-    latitude: "24.5761",
-    longitude: "80.8270",
-    availability: "Available",
-    accessibility: "Partially Accessible",
-    openingTime: "05:00",
-    closingTime: "23:00",
-    description: "Passenger vehicle parking facility.",
-    source: "Station Survey",
-    verificationStatus: "Pending",
-    lastVerified: "2026-09-17",
-  },
-  {
-    id: 12,
-    station: "Khandwa Junction",
-    stationCode: "KNW",
-    facilityType: "Charging Point",
-    facilityName: "Passenger Mobile Charging",
-    platform: "Platform 2",
-    location: "Waiting Area",
-    latitude: "21.8240",
-    longitude: "76.3500",
-    availability: "Available",
-    accessibility: "Accessible",
-    openingTime: "00:00",
-    closingTime: "23:59",
-    description: "Mobile charging points for passengers.",
-    source: "Station Survey",
-    verificationStatus: "Verified",
-    lastVerified: "2026-09-19",
-  },
-];
-
-/* =========================================================
    EMPTY FORM
 ========================================================= */
 
 const emptyFacility: Facility = {
   id: 0,
-  station: "Bhopal Junction",
-  stationCode: "BPL",
-  facilityType: "Toilet",
+  station: "",
+  stationCode: "",
+  facilityType: "",
   facilityName: "",
   platform: "",
   location: "",
@@ -363,9 +128,42 @@ const emptyFacility: Facility = {
    PAGE
 ========================================================= */
 
+const FACILITY_STORAGE_KEY = "railway-admin-facilities-v2";
+
 export default function FacilityManagementPage() {
   const [facilities, setFacilities] =
-    useState<Facility[]>(initialFacilities);
+    useState<Facility[]>([]);
+  const [storageReady, setStorageReady] = useState(false);
+
+  // Restore saved facility records once after the page mounts.
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(FACILITY_STORAGE_KEY);
+      if (saved) {
+        const parsed: unknown = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setFacilities(parsed as Facility[]);
+        }
+      }
+    } catch (error) {
+      console.error("Unable to load saved facilities:", error);
+    } finally {
+      setStorageReady(true);
+    }
+  }, []);
+
+  // Persist add/edit/delete changes in this browser (frontend-only).
+  useEffect(() => {
+    if (!storageReady) return;
+    try {
+      window.localStorage.setItem(
+        FACILITY_STORAGE_KEY,
+        JSON.stringify(facilities)
+      );
+    } catch (error) {
+      console.error("Unable to save facilities:", error);
+    }
+  }, [facilities, storageReady]);
 
   const [search, setSearch] = useState("");
   const [stationFilter, setStationFilter] = useState("All");
@@ -511,30 +309,58 @@ export default function FacilityManagementPage() {
   ========================================================= */
 
   const handleSave = () => {
-    if (
-      !formData.station ||
-      !formData.facilityName.trim() ||
-      !formData.facilityType ||
-      !formData.location.trim()
-    ) {
+    const name = formData.facilityName.trim();
+    const location = formData.location.trim();
+
+    if (!formData.station || !formData.stationCode || !name ||
+        !formData.facilityType || !location) {
       alert("Please fill all required fields.");
       return;
     }
 
-    if (modal === "add") {
-      const newFacility: Facility = {
-        ...formData,
-        id: Date.now(),
-      };
+    const latitude = formData.latitude.trim();
+    const longitude = formData.longitude.trim();
+    const isValidCoordinate = (value: string, min: number, max: number) => {
+      if (!value) return true;
+      const number = Number(value);
+      return Number.isFinite(number) && number >= min && number <= max;
+    };
 
-      setFacilities((prev) => [newFacility, ...prev]);
+    if (!isValidCoordinate(latitude, -90, 90)) {
+      alert("Please enter a valid latitude between -90 and 90.");
+      return;
+    }
+    if (!isValidCoordinate(longitude, -180, 180)) {
+      alert("Please enter a valid longitude between -180 and 180.");
+      return;
     }
 
-    if (modal === "edit") {
+    if (formData.openingTime && formData.closingTime &&
+        formData.openingTime > formData.closingTime) {
+      alert("Closing time must be after opening time.");
+      return;
+    }
+
+    const normalizedFacility: Facility = {
+      ...formData,
+      facilityName: name,
+      location,
+      latitude,
+      longitude,
+      source: formData.source.trim(),
+      description: formData.description.trim(),
+    };
+
+    if (modal === "add") {
+      setFacilities((prev) => [
+        { ...normalizedFacility, id: Date.now() },
+        ...prev,
+      ]);
+    } else if (modal === "edit") {
       setFacilities((prev) =>
         prev.map((facility) =>
-          facility.id === formData.id
-            ? formData
+          facility.id === normalizedFacility.id
+            ? normalizedFacility
             : facility
         )
       );
@@ -750,6 +576,12 @@ export default function FacilityManagementPage() {
       {/* =====================================================
           RESULT COUNT
       ===================================================== */}
+
+      {!storageReady && (
+        <p className="text-xs text-slate-400" role="status">
+          Loading saved facility records...
+        </p>
+      )}
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-500">

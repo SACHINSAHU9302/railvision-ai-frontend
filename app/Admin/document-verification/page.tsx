@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Search,
   SlidersHorizontal,
@@ -13,12 +13,10 @@ import {
   CalendarDays,
   User,
   Building2,
-  Languages,
   ExternalLink,
   X,
   Check,
   Ban,
-  RefreshCw,
   ShieldCheck,
   MessageSquare,
 } from "lucide-react";
@@ -91,148 +89,53 @@ const departments = [
 ];
 
 /* =========================================================
-   DUMMY DATA
+   DOCUMENT STORAGE
 ========================================================= */
 
-const initialDocuments: VerificationDocument[] = [
-  {
-    id: 1,
-    documentName: "Indian Railway Passenger Rules",
-    documentType: "Railway Rules",
-    department: "Operations",
-    source: "Indian Railways",
-    version: "v3.2",
-    language: "English",
-    uploadDate: "2026-09-28",
-    expiryDate: "2027-09-28",
-    fileType: "PDF",
-    fileSize: "2.4 MB",
-    status: "Approved",
-    verifiedBy: "Super Admin",
-    verifiedDate: "2026-09-28",
-    remarks: "Verified against the latest railway circular.",
-    documentUrl: "https://example.com/passenger-rules.pdf",
-  },
-  {
-    id: 2,
-    documentName: "Passenger Refund Rules 2026",
-    documentType: "Refund Rules",
-    department: "Commercial",
-    source: "Railway Board",
-    version: "v2.1",
-    language: "English",
-    uploadDate: "2026-09-26",
-    expiryDate: "2027-03-31",
-    fileType: "PDF",
-    fileSize: "1.8 MB",
-    status: "Pending",
-    verifiedBy: "—",
-    verifiedDate: "—",
-    remarks: "",
-    documentUrl: "https://example.com/refund-rules.pdf",
-  },
-  {
-    id: 3,
-    documentName: "Passenger Charter of Services",
-    documentType: "Passenger Charter",
-    department: "Passenger Services",
-    source: "Indian Railways",
-    version: "v4.0",
-    language: "English + Hindi",
-    uploadDate: "2026-09-25",
-    expiryDate: "2027-09-25",
-    fileType: "PDF",
-    fileSize: "3.1 MB",
-    status: "Approved",
-    verifiedBy: "Admin",
-    verifiedDate: "2026-09-26",
-    remarks: "Document source verified.",
-    documentUrl: "https://example.com/passenger-charter.pdf",
-  },
-  {
-    id: 4,
-    documentName: "Railway Safety Guidelines",
-    documentType: "Safety Guidelines",
-    department: "Safety",
-    source: "Safety Directorate",
-    version: "v5.1",
-    language: "English",
-    uploadDate: "2026-09-23",
-    expiryDate: "2026-12-31",
-    fileType: "PDF",
-    fileSize: "4.6 MB",
-    status: "Pending",
-    verifiedBy: "—",
-    verifiedDate: "—",
-    remarks: "",
-    documentUrl: "https://example.com/safety.pdf",
-  },
-  {
-    id: 5,
-    documentName: "Station Operating Manual",
-    documentType: "Station Rules",
-    department: "Operations",
-    source: "Operations Directorate",
-    version: "v2.4",
-    language: "English",
-    uploadDate: "2026-09-20",
-    expiryDate: "2026-10-15",
-    fileType: "PDF",
-    fileSize: "5.2 MB",
-    status: "Rejected",
-    verifiedBy: "Super Admin",
-    verifiedDate: "2026-09-21",
-    remarks:
-      "Document version could not be verified with the supplied source.",
-    documentUrl: "https://example.com/station-manual.pdf",
-  },
-  {
-    id: 6,
-    documentName: "Luggage and Parcel Rules",
-    documentType: "Luggage Rules",
-    department: "Commercial",
-    source: "Railway Board",
-    version: "v3.0",
-    language: "English",
-    uploadDate: "2026-09-18",
-    expiryDate: "2026-09-30",
-    fileType: "PDF",
-    fileSize: "1.2 MB",
-    status: "Expired",
-    verifiedBy: "Admin",
-    verifiedDate: "2026-09-19",
-    remarks: "Document validity period has expired.",
-    documentUrl: "https://example.com/luggage-rules.pdf",
-  },
-  {
-    id: 7,
-    documentName: "Railway Ticket Booking FAQ",
-    documentType: "FAQ",
-    department: "Passenger Services",
-    source: "Railway Helpdesk",
-    version: "v1.8",
-    language: "English + Hindi",
-    uploadDate: "2026-09-15",
-    expiryDate: "2027-09-15",
-    fileType: "PDF",
-    fileSize: "920 KB",
-    status: "Approved",
-    verifiedBy: "Admin",
-    verifiedDate: "2026-09-16",
-    remarks: "FAQ content verified.",
-    documentUrl: "https://example.com/ticket-faq.pdf",
-  },
-];
+const DOCUMENTS_STORAGE_KEY = "railway-admin-rag-documents";
 
 /* =========================================================
    PAGE
 ========================================================= */
 
 export default function DocumentVerificationPage() {
+  // Verification records are shared with the RAG Documents page through
+  // the same browser storage key until the Django API is integrated.
   const [documents, setDocuments] =
-    useState<VerificationDocument[]>(
-      initialDocuments
-    );
+    useState<VerificationDocument[]>([]);
+  const [storageReady, setStorageReady] = useState(false);
+
+  useEffect(() => {
+    try {
+      const savedDocuments = window.localStorage.getItem(
+        DOCUMENTS_STORAGE_KEY
+      );
+
+      if (savedDocuments) {
+        const parsed: unknown = JSON.parse(savedDocuments);
+        if (Array.isArray(parsed)) {
+          setDocuments(parsed.filter(isVerificationDocument));
+        }
+      }
+    } catch (error) {
+      console.error("Unable to load document verification records:", error);
+    } finally {
+      setStorageReady(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!storageReady) return;
+
+    try {
+      window.localStorage.setItem(
+        DOCUMENTS_STORAGE_KEY,
+        JSON.stringify(documents)
+      );
+    } catch (error) {
+      console.error("Unable to save document verification records:", error);
+    }
+  }, [documents, storageReady]);
 
   const [search, setSearch] = useState("");
 
@@ -293,7 +196,7 @@ export default function DocumentVerificationPage() {
 
       const matchesStatus =
         statusFilter === "All" ||
-        document.status === statusFilter;
+        getDocumentStatus(document) === statusFilter;
 
       return (
         matchesSearch &&
@@ -317,19 +220,19 @@ export default function DocumentVerificationPage() {
   const totalDocuments = documents.length;
 
   const pendingDocuments = documents.filter(
-    (document) => document.status === "Pending"
+    (document) => getDocumentStatus(document) === "Pending"
   ).length;
 
   const approvedDocuments = documents.filter(
-    (document) => document.status === "Approved"
+    (document) => getDocumentStatus(document) === "Approved"
   ).length;
 
   const rejectedDocuments = documents.filter(
-    (document) => document.status === "Rejected"
+    (document) => getDocumentStatus(document) === "Rejected"
   ).length;
 
   const expiredDocuments = documents.filter(
-    (document) => document.status === "Expired"
+    (document) => getDocumentStatus(document) === "Expired"
   ).length;
 
   /* =======================================================
@@ -374,9 +277,12 @@ export default function DocumentVerificationPage() {
   ) => {
     if (!selectedDocument) return;
 
-    const today = new Date()
-      .toISOString()
-      .split("T")[0];
+    if (status === "Approved" && isExpiredDate(selectedDocument.expiryDate)) {
+      alert("This document has expired. Update its expiry date before approving it.");
+      return;
+    }
+
+    const today = getTodayDateString();
 
     setDocuments((previous) =>
       previous.map((document) =>
@@ -397,25 +303,6 @@ export default function DocumentVerificationPage() {
     );
 
     closeModal();
-  };
-
-  /* =======================================================
-     EXPIRE
-  ======================================================= */
-
-  const markExpired = (
-    documentId: number
-  ) => {
-    setDocuments((previous) =>
-      previous.map((document) =>
-        document.id === documentId
-          ? {
-              ...document,
-              status: "Expired",
-            }
-          : document
-      )
-    );
   };
 
   /* =======================================================
@@ -632,6 +519,12 @@ export default function DocumentVerificationPage() {
           RESULT COUNT
       =================================================== */}
 
+      {!storageReady && (
+        <p className="text-xs text-slate-400" role="status">
+          Loading saved verification records...
+        </p>
+      )}
+
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-500">
           Showing{" "}
@@ -776,7 +669,7 @@ export default function DocumentVerificationPage() {
                     {/* STATUS */}
                     <td className="px-5 py-4">
                       <VerificationBadge
-                        status={document.status}
+                        status={getDocumentStatus(document)}
                       />
                     </td>
 
@@ -806,7 +699,7 @@ export default function DocumentVerificationPage() {
                           <Eye size={17} />
                         </ActionButton>
 
-                        {document.status ===
+                        {getDocumentStatus(document) ===
                           "Pending" && (
                           <>
                             <ActionButton
@@ -837,39 +730,20 @@ export default function DocumentVerificationPage() {
                           </>
                         )}
 
-                        {document.status ===
-                          "Approved" &&
-                          !isExpiredDate(
-                            document.expiryDate
-                          ) && (
-                            <ActionButton
-                              title="Mark Expired"
-                              danger
-                              onClick={() =>
-                                markExpired(
-                                  document.id
-                                )
-                              }
-                            >
-                              <AlertCircle
-                                size={17}
-                              />
-                            </ActionButton>
-                          )}
                       </div>
                     </td>
                   </tr>
                 )
               )}
 
-              {filteredDocuments.length ===
+              {storageReady && filteredDocuments.length ===
                 0 && (
                 <tr>
                   <td
                     colSpan={9}
                     className="px-5 py-16 text-center"
                   >
-                    <EmptyState />
+                    <EmptyState hasDocuments={documents.length > 0} />
                   </td>
                 </tr>
               )}
@@ -907,7 +781,7 @@ export default function DocumentVerificationPage() {
                     </div>
 
                     <VerificationBadge
-                      status={document.status}
+                      status={getDocumentStatus(document)}
                     />
                   </div>
 
@@ -957,7 +831,7 @@ export default function DocumentVerificationPage() {
                     <Eye size={16} />
                   </ActionButton>
 
-                  {document.status ===
+                  {getDocumentStatus(document) ===
                     "Pending" && (
                     <>
                       <ActionButton
@@ -991,10 +865,10 @@ export default function DocumentVerificationPage() {
           )
         )}
 
-        {filteredDocuments.length ===
+        {storageReady && filteredDocuments.length ===
           0 && (
           <div className="rounded-2xl border border-slate-200 bg-white px-5 py-16 text-center shadow-sm">
-            <EmptyState />
+            <EmptyState hasDocuments={documents.length > 0} />
           </div>
         )}
       </div>
@@ -1038,9 +912,7 @@ export default function DocumentVerificationPage() {
                 </div>
 
                 <VerificationBadge
-                  status={
-                    selectedDocument.status
-                  }
+                  status={getDocumentStatus(selectedDocument)}
                 />
               </div>
 
@@ -1134,7 +1006,8 @@ export default function DocumentVerificationPage() {
                     onClick={() =>
                       window.open(
                         selectedDocument.documentUrl,
-                        "_blank"
+                        "_blank",
+                        "noopener,noreferrer"
                       )
                     }
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-blue-50 hover:text-blue-600"
@@ -1166,7 +1039,7 @@ export default function DocumentVerificationPage() {
               </div>
 
               {/* ACTIONS */}
-              {selectedDocument.status ===
+              {getDocumentStatus(selectedDocument) ===
                 "Pending" && (
                 <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
                   <button
@@ -1568,7 +1441,7 @@ function ActionButton({
   );
 }
 
-function EmptyState() {
+function EmptyState({ hasDocuments }: { hasDocuments: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center">
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
@@ -1576,11 +1449,13 @@ function EmptyState() {
       </div>
 
       <h3 className="mt-3 text-sm font-semibold text-slate-800">
-        No documents found
+        {hasDocuments ? "No matching documents" : "No documents awaiting verification"}
       </h3>
 
-      <p className="mt-1 text-xs text-slate-500">
-        Try changing your search or filters.
+      <p className="mt-1 max-w-md text-xs text-slate-500">
+        {hasDocuments
+          ? "Try changing your search or filters."
+          : "Documents added in RAG Documents will appear here for review and approval."}
       </p>
     </div>
   );
@@ -1645,13 +1520,56 @@ function Modal({
   );
 }
 
-function isExpiredDate(
-  date: string
-) {
-  if (!date) return false;
+function isVerificationDocument(value: unknown): value is VerificationDocument {
+  if (!value || typeof value !== "object") return false;
+
+  const item = value as Record<string, unknown>;
+  const validStatuses: VerificationStatus[] = [
+    "Pending",
+    "Approved",
+    "Rejected",
+    "Expired",
+  ];
 
   return (
-    new Date(date).getTime() <
-    new Date().setHours(0, 0, 0, 0)
+    typeof item.id === "number" &&
+    typeof item.documentName === "string" &&
+    typeof item.documentType === "string" &&
+    typeof item.department === "string" &&
+    typeof item.source === "string" &&
+    typeof item.version === "string" &&
+    typeof item.language === "string" &&
+    typeof item.uploadDate === "string" &&
+    typeof item.expiryDate === "string" &&
+    (item.fileType === "PDF" || item.fileType === "DOCX") &&
+    typeof item.fileSize === "string" &&
+    validStatuses.includes(item.status as VerificationStatus) &&
+    typeof item.verifiedBy === "string" &&
+    typeof item.verifiedDate === "string" &&
+    typeof item.remarks === "string" &&
+    typeof item.documentUrl === "string"
   );
+}
+
+function getTodayDateString() {
+  const now = new Date();
+  return [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function isExpiredDate(date: string) {
+  if (!date) return false;
+  // Compare YYYY-MM-DD values using the browser's local calendar date.
+  return date < getTodayDateString();
+}
+
+function getDocumentStatus(document: VerificationDocument): VerificationStatus {
+  if (document.status === "Approved" && isExpiredDate(document.expiryDate)) {
+    return "Expired";
+  }
+
+  return document.status;
 }

@@ -32,7 +32,6 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
     { href: '/facilities', label: 'Facility Finder', icon: MapPin },
     { href: '/assistant', label: 'AI Assistant', icon: Bot, badge: 'RAG' },
     { href: '/documents', label: 'Railway Rules & Docs', icon: BookOpen },
-    { href: '/complaints', label: 'Grievance & Help', icon: AlertTriangle },
     { href: '/ticket-scanner', label: 'Ticket Scanner', icon: ScanLine },
     { href: '/voice-assistant', label: 'Voice Assistant', icon: Mic },
   ];

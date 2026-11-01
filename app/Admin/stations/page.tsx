@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   Building2,
   CheckCircle2,
@@ -38,214 +38,148 @@ interface Station {
 }
 
 /* ============================================================
-   DUMMY DATA
+   API CONFIGURATION
 ============================================================ */
 
-const initialStations: Station[] = [
-  {
-    id: 1,
-    code: "BPL",
-    name: "Bhopal Junction",
-    district: "Bhopal",
-    city: "Bhopal",
-    state: "Madhya Pradesh",
-    latitude: "23.2599",
-    longitude: "77.4126",
-    railwayZone: "WCR",
-    division: "Bhopal",
-    platforms: 6,
-    address: "Bhopal Railway Station, Bhopal, Madhya Pradesh",
-    status: "Active",
-  },
-  {
-    id: 2,
-    code: "RKMP",
-    name: "Rani Kamlapati",
-    district: "Bhopal",
-    city: "Bhopal",
-    state: "Madhya Pradesh",
-    latitude: "23.2149",
-    longitude: "77.4328",
-    railwayZone: "WCR",
-    division: "Bhopal",
-    platforms: 6,
-    address: "Habibganj, Bhopal, Madhya Pradesh",
-    status: "Active",
-  },
-  {
-    id: 3,
-    code: "INDB",
-    name: "Indore Junction",
-    district: "Indore",
-    city: "Indore",
-    state: "Madhya Pradesh",
-    latitude: "22.7196",
-    longitude: "75.8577",
-    railwayZone: "WR",
-    division: "Ratlam",
-    platforms: 6,
-    address: "Indore Railway Station, Indore, Madhya Pradesh",
-    status: "Active",
-  },
-  {
-    id: 4,
-    code: "UJN",
-    name: "Ujjain Junction",
-    district: "Ujjain",
-    city: "Ujjain",
-    state: "Madhya Pradesh",
-    latitude: "23.1765",
-    longitude: "75.7885",
-    railwayZone: "WR",
-    division: "Ratlam",
-    platforms: 8,
-    address: "Ujjain Junction, Ujjain, Madhya Pradesh",
-    status: "Active",
-  },
-  {
-    id: 5,
-    code: "JBP",
-    name: "Jabalpur Junction",
-    district: "Jabalpur",
-    city: "Jabalpur",
-    state: "Madhya Pradesh",
-    latitude: "23.1685",
-    longitude: "79.9339",
-    railwayZone: "WCR",
-    division: "Jabalpur",
-    platforms: 7,
-    address: "Jabalpur Railway Station, Jabalpur, Madhya Pradesh",
-    status: "Active",
-  },
-  {
-    id: 6,
-    code: "ET",
-    name: "Itarsi Junction",
-    district: "Narmadapuram",
-    city: "Itarsi",
-    state: "Madhya Pradesh",
-    latitude: "22.6123",
-    longitude: "77.7627",
-    railwayZone: "WCR",
-    division: "Bhopal",
-    platforms: 8,
-    address: "Itarsi Junction, Narmadapuram, Madhya Pradesh",
-    status: "Active",
-  },
-  {
-    id: 7,
-    code: "KTE",
-    name: "Katni Junction",
-    district: "Katni",
-    city: "Katni",
-    state: "Madhya Pradesh",
-    latitude: "23.8346",
-    longitude: "80.3944",
-    railwayZone: "WCR",
-    division: "Jabalpur",
-    platforms: 6,
-    address: "Katni Junction, Katni, Madhya Pradesh",
-    status: "Active",
-  },
-  {
-    id: 8,
-    code: "STA",
-    name: "Satna Junction",
-    district: "Satna",
-    city: "Satna",
-    state: "Madhya Pradesh",
-    latitude: "24.5827",
-    longitude: "80.8320",
-    railwayZone: "WCR",
-    division: "Jabalpur",
-    platforms: 5,
-    address: "Satna Junction, Satna, Madhya Pradesh",
-    status: "Active",
-  },
-  {
-    id: 9,
-    code: "SGO",
-    name: "Saugor Railway Station",
-    district: "Sagar",
-    city: "Sagar",
-    state: "Madhya Pradesh",
-    latitude: "23.8388",
-    longitude: "78.7378",
-    railwayZone: "WCR",
-    division: "Jabalpur",
-    platforms: 3,
-    address: "Sagar Railway Station, Sagar, Madhya Pradesh",
-    status: "Active",
-  },
-  {
-    id: 10,
-    code: "KNW",
-    name: "Khandwa Junction",
-    district: "Khandwa",
-    city: "Khandwa",
-    state: "Madhya Pradesh",
-    latitude: "21.8245",
-    longitude: "76.3509",
-    railwayZone: "CR",
-    division: "Bhusawal",
-    platforms: 5,
-    address: "Khandwa Junction, Khandwa, Madhya Pradesh",
-    status: "Active",
-  },
-  {
-    id: 11,
-    code: "BAU",
-    name: "Burhanpur Railway Station",
-    district: "Burhanpur",
-    city: "Burhanpur",
-    state: "Madhya Pradesh",
-    latitude: "21.3097",
-    longitude: "76.2307",
-    railwayZone: "CR",
-    division: "Bhusawal",
-    platforms: 3,
-    address: "Burhanpur Railway Station, Madhya Pradesh",
-    status: "Active",
-  },
-  {
-    id: 12,
-    code: "NAD",
-    name: "Nagda Junction",
-    district: "Ujjain",
-    city: "Nagda",
-    state: "Madhya Pradesh",
-    latitude: "23.4562",
-    longitude: "75.4170",
-    railwayZone: "WR",
-    division: "Ratlam",
-    platforms: 5,
-    address: "Nagda Junction, Ujjain, Madhya Pradesh",
-    status: "Active",
-  },
-  {
-    id: 13,
-    code: "REWA",
-    name: "Rewa Railway Station",
-    district: "Rewa",
-    city: "Rewa",
-    state: "Madhya Pradesh",
-    latitude: "24.5362",
-    longitude: "81.3037",
-    railwayZone: "WCR",
-    division: "Jabalpur",
-    platforms: 3,
-    address: "Rewa Railway Station, Rewa, Madhya Pradesh",
-    status: "Active",
-  },
-];
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
+type ApiStation = {
+  id: number;
+  station_code: string;
+  station_name: string;
+  city: string;
+  state: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  platform_count: number;
+};
+
+const mapApiStation = (item: ApiStation): Station => ({
+  id: item.id,
+  code: item.station_code,
+  name: item.station_name,
+  district: item.city || "",
+  city: item.city || "",
+  state: item.state || "",
+  latitude: String(item.latitude ?? ""),
+  longitude: String(item.longitude ?? ""),
+  railwayZone: "",
+  division: "",
+  platforms: Number(item.platform_count ?? 0),
+  address: item.address || "",
+  status: "Active",
+});
+
+// JWT refresh logic for Station CRUD requests.
+let stationRefreshPromise: Promise<string> | null = null;
+
+function clearStationAdminSessionAndRedirect() {
+  sessionStorage.removeItem("adminAccessToken");
+  sessionStorage.removeItem("adminRefreshToken");
+  sessionStorage.removeItem("adminUser");
+  sessionStorage.removeItem("accessToken");
+  sessionStorage.removeItem("access");
+  window.location.replace("/Admin/Login");
+}
+
+async function refreshStationAccessToken(): Promise<string> {
+  if (!stationRefreshPromise) {
+    stationRefreshPromise = (async () => {
+      const refresh = sessionStorage.getItem("adminRefreshToken");
+
+      if (!refresh) {
+        clearStationAdminSessionAndRedirect();
+        throw new Error("Admin session expired. Please log in again.");
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/auth/token/refresh/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh }),
+        cache: "no-store",
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || !data.access) {
+        clearStationAdminSessionAndRedirect();
+        throw new Error("Admin session expired. Please log in again.");
+      }
+
+      sessionStorage.setItem("adminAccessToken", data.access);
+      if (data.refresh) {
+        sessionStorage.setItem("adminRefreshToken", data.refresh);
+      }
+
+      return data.access as string;
+    })().finally(() => {
+      stationRefreshPromise = null;
+    });
+  }
+
+  return stationRefreshPromise;
+}
+
+async function stationApi(path: string, options: RequestInit = {}) {
+  let token =
+    typeof window !== "undefined"
+      ? sessionStorage.getItem("adminAccessToken")
+      : null;
+
+  if (!token) {
+    token = await refreshStationAccessToken();
+  }
+
+  const makeRequest = (accessToken: string) => {
+    const headers = new Headers(options.headers);
+    headers.set("Authorization", `Bearer ${accessToken}`);
+    if (options.body && !headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json");
+    }
+
+    return fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers,
+      cache: "no-store",
+    });
+  };
+
+  const tokenUsedForRequest = token;
+  let response = await makeRequest(tokenUsedForRequest);
+
+  if (response.status === 401) {
+    const latestToken = sessionStorage.getItem("adminAccessToken");
+    token =
+      latestToken && latestToken !== tokenUsedForRequest
+        ? latestToken
+        : await refreshStationAccessToken();
+    response = await makeRequest(token);
+  }
+
+  const body = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const detail =
+      body.detail ||
+      body.message ||
+      (typeof body === "object" ? JSON.stringify(body) : "");
+    throw new Error(detail || `Request failed (${response.status}).`);
+  }
+
+  return body;
+}
 
 /* ============================================================
    PAGE
 ============================================================ */
 
 export default function StationsPage() {
-  const [stations, setStations] =
-    useState<Station[]>(initialStations);
+  const [stations, setStations] = useState<Station[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [pageError, setPageError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const [search, setSearch] = useState("");
 
@@ -263,6 +197,30 @@ export default function StationsPage() {
 
   const [editingStation, setEditingStation] =
     useState<Station | null>(null);
+
+  const fetchStations = async () => {
+    try {
+      setPageError("");
+      setLoading(true);
+
+      const data = await stationApi("/api/stations/");
+      const rows: ApiStation[] = Array.isArray(data)
+        ? data
+        : data.results || data.stations || [];
+
+      setStations(rows.map(mapApiStation));
+    } catch (error) {
+      setPageError(
+        error instanceof Error ? error.message : "Unable to load stations."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStations();
+  }, []);
 
   const filteredStations = useMemo(() => {
     const query = search.toLowerCase().trim();
@@ -285,42 +243,69 @@ export default function StationsPage() {
      ADD / EDIT
   ========================================================== */
 
-  const handleSaveStation = (station: Station) => {
-    if (editingStation) {
-      setStations((current) =>
-        current.map((item) =>
-          item.id === station.id ? station : item
-        )
-      );
-    } else {
-      setStations((current) => [
-        ...current,
-        {
-          ...station,
-          id: Date.now(),
-        },
-      ]);
-    }
+  const handleSaveStation = async (station: Station) => {
+    try {
+      setSaving(true);
+      setPageError("");
 
-    setIsAddModalOpen(false);
-    setEditingStation(null);
+      const payload = {
+        station_code: station.code.trim().toUpperCase(),
+        station_name: station.name.trim(),
+        city: station.city.trim(),
+        state: station.state.trim(),
+        address: station.address.trim(),
+        latitude: Number(station.latitude),
+        longitude: Number(station.longitude),
+        platform_count: Number(station.platforms),
+      };
+
+      if (editingStation) {
+        await stationApi(`/api/stations/${editingStation.id}/`, {
+          method: "PUT",
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await stationApi("/api/stations/", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      }
+
+      await fetchStations();
+      setIsAddModalOpen(false);
+      setEditingStation(null);
+    } catch (error) {
+      setPageError(
+        error instanceof Error ? error.message : "Unable to save station."
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   /* ==========================================================
      DELETE
   ========================================================== */
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selectedStation) return;
 
-    setStations((current) =>
-      current.filter(
-        (station) => station.id !== selectedStation.id
-      )
-    );
+    try {
+      setPageError("");
+      await stationApi(`/api/stations/${selectedStation.id}/`, {
+        method: "DELETE",
+      });
 
-    setSelectedStation(null);
-    setIsDeleteModalOpen(false);
+      setStations((current) =>
+        current.filter((station) => station.id !== selectedStation.id)
+      );
+      setSelectedStation(null);
+      setIsDeleteModalOpen(false);
+    } catch (error) {
+      setPageError(
+        error instanceof Error ? error.message : "Unable to delete station."
+      );
+    }
   };
 
   return (
@@ -359,6 +344,18 @@ export default function StationsPage() {
           Add Station
         </button>
       </div>
+
+      {pageError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {pageError}
+        </div>
+      )}
+
+      {loading && (
+        <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+          Loading stations from database...
+        </div>
+      )}
 
       {/* ======================================================
           SUMMARY
@@ -684,6 +681,7 @@ export default function StationsPage() {
             setEditingStation(null);
           }}
           onSave={handleSaveStation}
+          saving={saving}
         />
       )}
 
@@ -887,10 +885,12 @@ function StationFormModal({
   station,
   onClose,
   onSave,
+  saving,
 }: {
   station: Station | null;
   onClose: () => void;
-  onSave: (station: Station) => void;
+  onSave: (station: Station) => void | Promise<void>;
+  saving: boolean;
 }) {
   const [form, setForm] = useState<Station>(
     station ?? {
@@ -1134,9 +1134,10 @@ function StationFormModal({
 
           <button
             type="submit"
-            className="h-10 rounded-lg bg-[#071a33] px-5 text-sm font-semibold text-white transition hover:bg-blue-700"
+            disabled={saving}
+            className="h-10 rounded-lg bg-[#071a33] px-5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {station ? "Update Station" : "Add Station"}
+            {saving ? "Saving..." : station ? "Update Station" : "Add Station"}
           </button>
         </div>
       </form>

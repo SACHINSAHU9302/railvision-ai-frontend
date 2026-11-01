@@ -15,8 +15,8 @@ export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const [email, setEmail] = React.useState('passenger@railvision.ai');
-  const [password, setPassword] = React.useState('Railway2026!');
+  const [email, setEmail] = React.useState('');
+const [password, setPassword] = React.useState('');
   const [rememberMe, setRememberMe] = React.useState(true);
   const [showPassword, setShowPassword] = React.useState(false);
 
@@ -172,12 +172,7 @@ export default function LoginPage() {
               </Button>
 
               {/* Demo Mode Notice */}
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 text-center">
-                <p className="text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
-                  <Shield className="w-3.5 h-3.5 text-blue-500" />
-                  <span>Demo Mode Active: Pre-filled credentials ready</span>
-                </p>
-              </div>
+              
             </form>
           )}
 

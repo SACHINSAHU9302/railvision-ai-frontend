@@ -1,6 +1,5 @@
-import { apiClient, isDemoMode } from './client';
+import { apiClient } from './client';
 import { Station, StationSearchResult } from '@/types/station';
-import { DEMO_STATIONS } from '../demo/stations';
 
 interface BackendStation {
   id: number;
@@ -9,33 +8,37 @@ interface BackendStation {
   city: string;
   state: string;
   address: string;
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
   platform_count: number;
+}
+
+interface BackendPlatform {
+  id: number;
+  platform_number: number;
+  name: string;
+  accessibility: boolean;
+}
+
+interface BackendFacility {
+  id: number;
+  facility_type: string;
+  facility_name: string;
+  description: string;
+  platform_id: number | null;
+  platform_number: number | null;
+  latitude: number | null;
+  longitude: number | null;
+  accessibility: boolean;
+  contact_info: string;
+  additional_notes: string;
 }
 
 interface BackendStationDetailResponse {
   success: boolean;
   station: BackendStation;
-  platforms: {
-    id: number;
-    platform_number: number;
-    name: string;
-    accessibility: boolean;
-  }[];
-  facilities: {
-    id: number;
-    facility_type: string;
-    facility_name: string;
-    description: string;
-    platform_id: number | null;
-    platform_number: number | null;
-    latitude: number | null;
-    longitude: number | null;
-    accessibility: boolean;
-    contact_info: string;
-    additional_notes: string;
-  }[];
+  platforms: BackendPlatform[];
+  facilities: BackendFacility[];
 }
 
 interface StationListResponse {
@@ -46,8 +49,8 @@ interface StationListResponse {
 
 function mapStation(
   item: BackendStation,
-  backendPlatforms: BackendStationDetailResponse['platforms'] = [],
-  backendFacilities: BackendStationDetailResponse['facilities'] = []
+  backendPlatforms: BackendPlatform[] = [],
+  backendFacilities: BackendFacility[] = []
 ): Station {
   const countByType = (types: string[]) =>
     backendFacilities.filter((facility) =>
@@ -60,13 +63,13 @@ function mapStation(
     name: item.station_name,
     city: item.city,
     state: item.state,
-    address: item.address,
-    latitude: item.latitude,
-    longitude: item.longitude,
+    address: item.address || '',
+    latitude: item.latitude ?? undefined,
+    longitude: item.longitude ?? undefined,
 
-    // Fields used by the existing frontend
     zone: '',
     category: 'B',
+
     platformsCount: item.platform_count,
 
     platforms: backendPlatforms.map((platform) => ({
@@ -77,7 +80,10 @@ function mapStation(
       hasElevator: false,
       hasEscalator: false,
       status: 'active' as const,
-      coordinates: { x: 0, y: 0 },
+      coordinates: {
+        x: 0,
+        y: 0,
+      },
     })),
 
     amenities: {
@@ -100,14 +106,16 @@ function mapStation(
       .map((facility) => ({
         id: String(facility.id),
         name: facility.facility_name,
-        type: (
-          facility.facility_type === 'foot_over_bridge'
+        type:
+          facility.facility_type.toLowerCase() === 'foot_over_bridge'
             ? 'bridge'
-            : 'ticket_counter'
-        ) as 'bridge' | 'ticket_counter',
+            : 'ticket_counter',
         locationDescription: facility.description || '',
         platformNear: facility.platform_number ?? 0,
-        coordinates: { x: 0, y: 0 },
+        coordinates: {
+          x: 0,
+          y: 0,
+        },
       })),
 
     layoutDescription: item.address || `${item.city}, ${item.state}`,
@@ -115,38 +123,25 @@ function mapStation(
   };
 }
 
+// Get all stations
 export async function getStations(): Promise<Station[]> {
-  if (isDemoMode()) {
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    return [...DEMO_STATIONS];
-  }
-
-  const response = await apiClient<StationListResponse>('/api/stations/');
+  const response = await apiClient<StationListResponse>(
+    '/api/stations/'
+  );
 
   if (!response || !Array.isArray(response.results)) {
     throw new Error('Invalid stations response from backend');
   }
 
-  // List API does not include platform/facility details.
-  // Those fields are initialized safely until station details are loaded.
   return response.results.map((station) => mapStation(station));
 }
 
+// Get station details
 export async function getStationById(
   id: string
 ): Promise<Station | null> {
-  if (isDemoMode()) {
-    return (
-      DEMO_STATIONS.find(
-        (station) =>
-          station.id.toLowerCase() === id.toLowerCase() ||
-          station.code.toLowerCase() === id.toLowerCase()
-      ) || null
-    );
-  }
-
   const response = await apiClient<BackendStationDetailResponse>(
-    `/api/stations/${id}/`
+    `/api/stations/${encodeURIComponent(id)}/`
   );
 
   if (!response?.station) {
@@ -160,6 +155,7 @@ export async function getStationById(
   );
 }
 
+// Search stations
 export async function searchStations(
   query: string
 ): Promise<StationSearchResult[]> {

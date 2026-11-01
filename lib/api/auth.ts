@@ -1,64 +1,264 @@
-import { LoginCredentials, RegisterCredentials, User, AuthSession } from '@/types/auth';
+import {
+  LoginCredentials,
+  RegisterCredentials,
+  User,
+  AuthSession,
+} from '@/types/auth';
+
 import { isDemoMode } from './client';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const DEMO_USER: User = {
   id: 'usr-default',
-  name: 'Passenger Adarsh',
+  name: 'Passenger',
   email: 'passenger@railvision.ai',
   role: 'passenger',
-  phone: '+91 98765 43210',
+  phone: '',
   preferredLanguage: 'English',
   createdAt: '2026-09-01T00:00:00Z',
 };
 
-export async function loginUser(credentials: LoginCredentials): Promise<AuthSession> {
-  if (isDemoMode()) {
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    return {
-      user: {
-        ...DEMO_USER,
-        email: credentials.email,
-        name: credentials.email.split('@')[0] || 'Passenger',
-      },
-      isAuthenticated: true,
-      token: 'demo-jwt-session-token',
-    };
-  }
-
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(credentials),
-  });
-  if (!res.ok) throw new Error('Authentication failed');
-  return res.json();
+interface AuthTokenResponse {
+  access: string;
+  refresh: string;
 }
 
-export async function registerUser(credentials: RegisterCredentials): Promise<AuthSession> {
-  if (isDemoMode()) {
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    return {
-      user: {
-        id: `usr-${Date.now()}`,
-        name: credentials.name,
-        email: credentials.email,
-        role: 'passenger',
-        createdAt: new Date().toISOString(),
-      },
-      isAuthenticated: true,
-      token: 'demo-jwt-session-token',
-    };
-  }
-
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(credentials),
-  });
-  if (!res.ok) throw new Error('Registration failed');
-  return res.json();
+interface BackendUser {
+  id: number;
+  username: string;
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  date_joined?: string;
 }
 
+interface RegisterResponse {
+  success: boolean;
+  message: string;
+  access: string;
+  refresh: string;
+  user: BackendUser;
+}
+
+async function parseResponse<T>(response: Response): Promise<T> {
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    let message = 'Something went wrong. Please try again.';
+
+    if (data && typeof data === 'object') {
+      if (typeof data.detail === 'string') {
+        message = data.detail;
+      } else if (typeof data.message === 'string') {
+        message = data.message;
+      } else {
+        const errors = Object.values(data)
+          .flat()
+          .filter(
+            (value): value is string => typeof value === 'string',
+          );
+
+        if (errors.length > 0) {
+          message = errors.join(' ');
+        }
+      }
+    }
+
+    throw new Error(message);
+  }
+
+  return data as T;
+}
+
+// Save JWT tokens after successful registration or login.
+function saveTokens(
+  accessToken: string,
+  refreshToken: string,
+  rememberMe = true,
+): void {
+  if (typeof window === 'undefined') return;
+
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
+
+  sessionStorage.removeItem('accessToken');
+  sessionStorage.removeItem('refreshToken');
+
+  const storage = rememberMe ? localStorage : sessionStorage;
+
+  storage.setItem('accessToken', accessToken);
+  storage.setItem('refreshToken', refreshToken);
+}
+
+// Get the stored access token.
+export function getStoredAccessToken(): string | null {
+  if (typeof window === 'undefined') return null;
+
+  return (
+    sessionStorage.getItem('accessToken') ||
+    localStorage.getItem('accessToken')
+  );
+}
+
+// Clear authentication tokens.
+export function logoutUser(): void {
+  if (typeof window === 'undefined') return;
+
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
+
+  sessionStorage.removeItem('accessToken');
+  sessionStorage.removeItem('refreshToken');
+}
+
+// Register passenger and automatically establish an authenticated session.
+export async function registerUser(
+  credentials: RegisterCredentials,
+): Promise<AuthSession> {
+  if (isDemoMode()) {
+    throw new Error(
+      'Demo Mode is active. Please configure the Django backend connection.',
+    );
+  }
+
+  if (!API_URL) {
+    throw new Error(
+      'API URL is not configured. Check NEXT_PUBLIC_API_URL.',
+    );
+  }
+
+  const username = credentials.email
+    .trim()
+    .toLowerCase()
+    .split('@')[0];
+
+  const response = await fetch(`${API_URL}/api/auth/register/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      name: credentials.name.trim(),
+      username,
+      email: credentials.email.trim().toLowerCase(),
+      password: credentials.password,
+      password2: credentials.confirmPassword,
+    }),
+  });
+
+  const data = await parseResponse<RegisterResponse>(response);
+
+  if (!data.access || !data.refresh) {
+    throw new Error(
+      'Account created, but authentication tokens were not returned. Please log in.',
+    );
+  }
+
+  // Save the tokens returned by Django.
+  saveTokens(data.access, data.refresh, true);
+
+  try {
+    // Fetch the actual profile of the newly registered user.
+    const user = await getCurrentUser(data.access);
+
+    return {
+      user,
+      isAuthenticated: true,
+      token: data.access,
+    };
+  } catch (error) {
+    // Avoid leaving an invalid session behind.
+    logoutUser();
+    throw error;
+  }
+}
+
+// Login using Django Simple JWT.
+export async function loginUser(
+  credentials: LoginCredentials,
+): Promise<AuthSession> {
+  if (isDemoMode()) {
+    throw new Error(
+      'Demo Mode is active. Please configure the Django backend connection.',
+    );
+  }
+
+  if (!API_URL) {
+    throw new Error(
+      'API URL is not configured. Check NEXT_PUBLIC_API_URL.',
+    );
+  }
+
+  const response = await fetch(`${API_URL}/api/auth/token/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      email: credentials.email.trim().toLowerCase(),
+      password: credentials.password,
+    }),
+  });
+
+  const data = await parseResponse<AuthTokenResponse>(response);
+
+  saveTokens(
+    data.access,
+    data.refresh,
+    credentials.rememberMe ?? true,
+  );
+
+  try {
+    const user = await getCurrentUser(data.access);
+
+    return {
+      user,
+      isAuthenticated: true,
+      token: data.access,
+    };
+  } catch (error) {
+    logoutUser();
+    throw error;
+  }
+}
+
+// Fetch the logged-in user's Django profile.
+export async function getCurrentUser(
+  accessToken: string,
+): Promise<User> {
+  if (!API_URL) {
+    throw new Error(
+      'API URL is not configured. Check NEXT_PUBLIC_API_URL.',
+    );
+  }
+
+  const response = await fetch(`${API_URL}/api/auth/profile/`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    cache: 'no-store',
+  });
+
+  const data = await parseResponse<BackendUser>(response);
+
+  const fullName =
+    `${data.first_name ?? ''} ${data.last_name ?? ''}`.trim() ||
+    data.username ||
+    data.email;
+
+  return {
+    id: String(data.id),
+    name: fullName,
+    email: data.email,
+    role: 'passenger',
+    createdAt: data.date_joined ?? new Date().toISOString(),
+  };
+}
+
+// Demo session helper.
 export function getInitialDemoSession(): AuthSession {
   return {
     user: DEMO_USER,

@@ -1,85 +1,207 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-
 import {
   TrainFront,
   Mail,
-  Lock,
-  Eye,
-  EyeOff,
   ArrowRight,
+  ShieldCheck,
 } from "lucide-react";
+
+type LoginStep = "email" | "otp";
+
+// Django backend base URL; override with NEXT_PUBLIC_API_URL in .env.local.
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export default function AdminLoginPage() {
   const router = useRouter();
 
-  const [showPassword, setShowPassword] = useState(false);
+  const [step, setStep] = useState<LoginStep>("email");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [seconds, setSeconds] = useState(0);
 
-  // ==========================================
-  // LOGIN
-  // ==========================================
+  // OTP resend countdown
+  useEffect(() => {
+    if (step !== "otp" || seconds <= 0) return;
 
-  const handleLogin = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+    const timer = window.setTimeout(() => {
+      setSeconds((previous) => previous - 1);
+    }, 1000);
 
+    return () => window.clearTimeout(timer);
+  }, [step, seconds]);
+
+  // Step 1: Request an OTP from the Django backend.
+  const handleSendOTP = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault();
     setError("");
-    setLoading(true);
+    setMessage("");
 
-    // Temporary admin credentials
-    const adminEmail = "admin@example.com";
-    const adminPassword = "admin123";
-
-    if (
-      email.trim().toLowerCase() === adminEmail &&
-      password === adminPassword
-    ) {
-      localStorage.setItem("isAdmin", "true");
-
-      localStorage.setItem(
-        "adminUser",
-        JSON.stringify({
-          name: "Admin User",
-          email: adminEmail,
-          role: "Super Admin",
-        })
-      );
-
-      router.push("/Admin");
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setError("Please enter your email address.");
       return;
     }
 
-    setError("Invalid email or password.");
-    setLoading(false);
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/auth/admin/send-otp/`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: normalizedEmail }),
+        }
+      );
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Unable to request an OTP.");
+      }
+
+      // The API intentionally uses a generic message to avoid revealing
+      // whether an email belongs to an authorized administrator.
+      setEmail(normalizedEmail);
+      setOtp("");
+      setStep("otp");
+      setSeconds(60);
+      setMessage(
+        data.message ||
+          "If this email belongs to an authorized admin, an OTP has been requested."
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to connect to the server. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Step 2: Verify the OTP and receive JWT tokens.
+  const handleVerifyOTP = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault();
+    setError("");
+    setMessage("");
+
+    if (!/^\d{6}$/.test(otp)) {
+      setError("Please enter a valid 6-digit OTP.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/auth/admin/verify-otp/`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: email.trim().toLowerCase(),
+            otp,
+          }),
+        }
+      );
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "OTP verification failed.");
+      }
+
+      if (!data.access || !data.refresh) {
+        throw new Error("The server did not return authentication tokens.");
+      }
+
+      // Development implementation. For production, prefer HttpOnly,
+      // Secure cookies set by the backend instead of JS-readable storage.
+      sessionStorage.setItem("adminAccessToken", data.access);
+      sessionStorage.setItem("adminRefreshToken", data.refresh);
+      sessionStorage.setItem("adminUser", JSON.stringify(data.user ?? {}));
+
+      setMessage("Login successful. Opening dashboard...");
+      router.replace("/Admin");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "OTP verification failed. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Request a fresh OTP after the resend cooldown.
+  const handleResendOTP = async () => {
+    if (seconds > 0 || loading) return;
+
+    setError("");
+    setMessage("");
+    setLoading(true);
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/auth/admin/send-otp/`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: email.trim().toLowerCase() }),
+        }
+      );
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Unable to resend OTP.");
+      }
+
+      setOtp("");
+      setSeconds(60);
+      setMessage(
+        data.message ||
+          "If this email belongs to an authorized admin, a new OTP has been requested."
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to resend OTP. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangeEmail = () => {
+    setStep("email");
+    setOtp("");
+    setError("");
+    setMessage("");
+    setSeconds(0);
   };
 
   return (
     <main className="min-h-screen w-full overflow-x-hidden bg-slate-50 lg:flex">
-
-      {/* =====================================================
-          DESKTOP LEFT PANEL
-          Hidden on mobile
-      ====================================================== */}
-
+      {/* Left panel */}
       <section className="relative hidden min-h-screen overflow-hidden lg:flex lg:w-1/2">
-        {/* Background */}
         <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900" />
 
-        {/* Glow */}
         <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-blue-600/10 blur-3xl" />
 
         <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-cyan-500/10 blur-3xl" />
 
-        {/* Content */}
         <div className="relative z-10 flex min-h-screen w-full flex-col justify-between p-12 xl:p-16">
-
-          {/* Logo */}
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600">
               <TrainFront className="h-6 w-6 text-white" />
@@ -96,7 +218,6 @@ export default function AdminLoginPage() {
             </div>
           </div>
 
-          {/* Main Content */}
           <div className="max-w-xl">
             <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-blue-400">
               Railway Intelligence System
@@ -110,384 +231,228 @@ export default function AdminLoginPage() {
             </h2>
 
             <p className="mt-5 max-w-lg text-base leading-7 text-slate-400">
-              Monitor stations, facilities, AI agents,
-              documents, complaints and railway data from
-              one centralized admin panel.
+              Monitor stations, facilities, AI agents, documents,
+              complaints and railway data from one centralized
+              admin panel.
             </p>
           </div>
 
-          {/* Footer */}
           <p className="text-xs text-slate-500">
             © 2026 Railway-AI. Admin access only.
           </p>
         </div>
       </section>
 
-      {/* =====================================================
-          LOGIN SECTION
-      ====================================================== */}
+      
+{/* LOGIN SECTION */}
+<section className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50/70 px-4 py-10 sm:px-8 lg:w-1/2 lg:px-12">
+  {/* Subtle background decoration */}
+  <div className="pointer-events-none absolute right-0 top-0 h-72 w-72 rounded-full bg-blue-100/50 blur-3xl" />
+  <div className="pointer-events-none absolute bottom-0 left-0 h-64 w-64 rounded-full bg-indigo-100/40 blur-3xl" />
 
-      <section
-        className="
-          flex min-h-screen w-full
-          items-center justify-center
-          bg-slate-50
-          px-4 py-6
-          sm:px-6 sm:py-8
-          lg:w-1/2
-          lg:px-8
-        "
-      >
-        <div className="w-full max-w-md">
+  <div className="relative z-10 w-full max-w-[440px]">
+    {/* Mobile logo */}
+    <div className="mb-8 flex flex-col items-center lg:hidden">
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/20">
+        <TrainFront className="h-6 w-6" />
+      </div>
 
-          {/* =================================================
-              MOBILE LOGO
-          ================================================== */}
+      <h1 className="mt-3 text-lg font-bold text-slate-900">
+        Railway-AI
+      </h1>
 
-          <div className="mb-5 flex flex-col items-center lg:hidden">
+      <p className="text-sm text-slate-500">Admin Portal</p>
+    </div>
 
-            {/* Logo */}
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600 shadow-md shadow-blue-600/20">
-              <TrainFront className="h-6 w-6 text-white" />
+    {/* Login card */}
+    <div className="rounded-3xl border border-slate-200/80 bg-white/95 p-6 shadow-[0_20px_70px_-25px_rgba(15,23,42,0.18)] backdrop-blur-xl sm:p-9">
+      {/* Security badge */}
+      <div className="mb-7 flex items-center gap-3">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 ring-1 ring-blue-100">
+          <ShieldCheck className="h-6 w-6" />
+        </div>
+
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">
+            Secure Authentication
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Authorized administrators only
+          </p>
+        </div>
+      </div>
+
+      {/* Heading */}
+      <div className="mb-8">
+        <h2 className="text-3xl font-bold tracking-tight text-slate-900">
+          Admin Login
+        </h2>
+
+        <p className="mt-3 text-sm leading-6 text-slate-500">
+          Sign in securely using a one-time verification code
+          sent to your registered email address.
+        </p>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div
+          role="alert"
+          className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700"
+        >
+          {error}
+        </div>
+      )}
+
+      {/* Success */}
+      {message && (
+        <div
+          role="status"
+          className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-5 text-emerald-700"
+        >
+          {message}
+        </div>
+      )}
+
+      {step === "email" ? (
+        <form onSubmit={handleSendOTP} className="space-y-6">
+          <div>
+            <label
+              htmlFor="admin-email"
+              className="mb-2 block text-sm font-semibold text-slate-700"
+            >
+              Registered Email Address
+            </label>
+
+            <div className="group relative">
+              <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 transition group-focus-within:text-blue-600" />
+
+              <input
+                id="admin-email"
+                type="email"
+                value={email}
+                onChange={(event) => {
+                  setEmail(event.target.value);
+                  setError("");
+                  setMessage("");
+                }}
+                placeholder="admin@yourcompany.com"
+                autoComplete="email"
+                maxLength={254}
+                required
+                className="h-14 w-full rounded-xl border border-slate-200 bg-slate-50/80 pl-12 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+              />
             </div>
 
-            {/* Name */}
-            <h1 className="mt-2 text-lg font-bold text-slate-900">
-              Railway-AI
-            </h1>
-
-            <p className="text-xs text-slate-500">
-              Admin Panel
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              Use the email address registered for your admin account.
             </p>
           </div>
 
-          {/* =================================================
-              LOGIN CARD
-          ================================================== */}
-
-          <div
-            className="
-              w-full
-              rounded-2xl
-              border border-slate-200
-              bg-white
-              p-5
-              shadow-lg shadow-slate-200/60
-              sm:p-8
-            "
+          <button
+            type="submit"
+            disabled={loading}
+            className="group flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-700 hover:shadow-xl hover:shadow-blue-600/25 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
           >
-
-            {/* Heading */}
-            <div className="mb-6 text-left sm:mb-8">
-
-              <h2 className="text-2xl font-bold text-slate-900">
-                Admin Login
-              </h2>
-
-              <p className="mt-1.5 text-sm leading-5 text-slate-500">
-                Sign in to access the Railway-AI admin panel.
-              </p>
-
-            </div>
-
-            {/* =================================================
-                FORM
-            ================================================== */}
-
-            <form
-              onSubmit={handleLogin}
-              className="space-y-4 sm:space-y-5"
+            {loading ? (
+              "Sending OTP..."
+            ) : (
+              <>
+                Send Verification Code
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+              </>
+            )}
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={handleVerifyOTP} className="space-y-6">
+          <div>
+            <label
+              htmlFor="admin-otp"
+              className="mb-2 block text-sm font-semibold text-slate-700"
             >
+              6-Digit Verification Code
+            </label>
 
-              {/* ================= EMAIL ================= */}
+            <input
+              id="admin-otp"
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]{6}"
+              minLength={6}
+              maxLength={6}
+              value={otp}
+              onChange={(event) => {
+                setOtp(event.target.value.replace(/\D/g, "").slice(0, 6));
+                setError("");
+              }}
+              placeholder="000000"
+              required
+              className="h-16 w-full rounded-xl border border-slate-200 bg-slate-50 text-center text-2xl font-bold tracking-[0.6em] text-slate-900 outline-none transition placeholder:text-slate-300 placeholder:tracking-[0.6em] focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+            />
 
-              <div>
-                <label
-                  htmlFor="email"
-                  className="mb-1.5 block text-sm font-medium text-slate-700"
-                >
-                  Email Address
-                </label>
-
-                <div className="relative">
-
-                  <Mail
-                    className="
-                      pointer-events-none
-                      absolute left-3
-                      top-1/2
-                      h-5 w-5
-                      -translate-y-1/2
-                      text-slate-400
-                    "
-                  />
-
-                  <input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      setError("");
-                    }}
-                    placeholder="admin@example.com"
-                    autoComplete="email"
-                    required
-                    className="
-                      h-11
-                      w-full
-                      rounded-lg
-                      border border-slate-200
-                      bg-slate-50
-                      pl-11
-                      pr-4
-                      text-sm
-                      text-slate-900
-                      outline-none
-                      transition
-                      placeholder:text-slate-400
-                      focus:border-blue-500
-                      focus:bg-white
-                      focus:ring-2
-                      focus:ring-blue-500/10
-                    "
-                  />
-
-                </div>
-              </div>
-
-              {/* ================= PASSWORD ================= */}
-
-              <div>
-
-                <div className="mb-1.5 flex items-center justify-between">
-                  <label
-                    htmlFor="password"
-                    className="text-sm font-medium text-slate-700"
-                  >
-                    Password
-                  </label>
-
-                  <button
-                    type="button"
-                    className="
-                      text-xs
-                      font-medium
-                      text-blue-600
-                      transition
-                      hover:text-blue-700
-                    "
-                  >
-                    Forgot password?
-                  </button>
-                </div>
-
-                <div className="relative">
-
-                  <Lock
-                    className="
-                      pointer-events-none
-                      absolute left-3
-                      top-1/2
-                      h-5 w-5
-                      -translate-y-1/2
-                      text-slate-400
-                    "
-                  />
-
-                  <input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      setError("");
-                    }}
-                    placeholder="Enter your password"
-                    autoComplete="current-password"
-                    required
-                    className="
-                      h-11
-                      w-full
-                      rounded-lg
-                      border border-slate-200
-                      bg-slate-50
-                      pl-11
-                      pr-11
-                      text-sm
-                      text-slate-900
-                      outline-none
-                      transition
-                      placeholder:text-slate-400
-                      focus:border-blue-500
-                      focus:bg-white
-                      focus:ring-2
-                      focus:ring-blue-500/10
-                    "
-                  />
-
-                  {/* Eye Button */}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setShowPassword((prev) => !prev)
-                    }
-                    className="
-                      absolute
-                      right-3
-                      top-1/2
-                      flex
-                      h-8
-                      w-8
-                      -translate-y-1/2
-                      items-center
-                      justify-center
-                      rounded-md
-                      text-slate-400
-                      transition
-                      hover:bg-slate-100
-                      hover:text-slate-600
-                    "
-                    aria-label={
-                      showPassword
-                        ? "Hide password"
-                        : "Show password"
-                    }
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
-                  </button>
-
-                </div>
-              </div>
-
-              {/* ================= ERROR ================= */}
-
-              {error && (
-                <div
-                  className="
-                    rounded-lg
-                    border border-red-200
-                    bg-red-50
-                    px-3
-                    py-2.5
-                    text-sm
-                    text-red-600
-                  "
-                >
-                  {error}
-                </div>
-              )}
-
-              {/* ================= REMEMBER ================= */}
-
-              <div className="flex items-center gap-2 pt-1">
-
-                <input
-                  id="remember"
-                  type="checkbox"
-                  className="
-                    h-4
-                    w-4
-                    shrink-0
-                    rounded
-                    border-slate-300
-                    text-blue-600
-                    focus:ring-blue-500
-                  "
-                />
-
-                <label
-                  htmlFor="remember"
-                  className="text-sm text-slate-600"
-                >
-                  Remember me
-                </label>
-
-              </div>
-
-              {/* ================= LOGIN BUTTON ================= */}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="
-                  flex
-                  h-11
-                  w-full
-                  items-center
-                  justify-center
-                  gap-2
-                  rounded-lg
-                  bg-blue-600
-                  text-sm
-                  font-semibold
-                  text-white
-                  shadow-md
-                  shadow-blue-600/20
-                  transition-all
-                  hover:bg-blue-700
-                  hover:shadow-lg
-                  hover:shadow-blue-600/25
-                  active:scale-[0.99]
-                  disabled:cursor-not-allowed
-                  disabled:opacity-60
-                "
-              >
-                {loading ? (
-                  "Signing in..."
-                ) : (
-                  <>
-                    Sign In
-                    <ArrowRight className="h-4 w-4" />
-                  </>
-                )}
-              </button>
-
-            </form>
-
-            {/* =================================================
-                SIGN UP
-            ================================================== */}
-
-            <div className="mt-5 border-t border-slate-100 pt-5 text-center sm:mt-6 sm:pt-6">
-
-              <p className="text-sm leading-5 text-slate-500">
-                Don&apos;t have an admin account?
-              </p>
-
-              <Link
-                href="/Admin/signup"
-                className="
-                  mt-1
-                  inline-block
-                  text-sm
-                  font-semibold
-                  text-blue-600
-                  transition
-                  hover:text-blue-700
-                "
-              >
-                Create account
-              </Link>
-
-            </div>
-
+            <p className="mt-3 break-all text-xs leading-5 text-slate-500">
+              Enter the code sent to{" "}
+              <span className="font-semibold text-slate-700">
+                {email.trim().toLowerCase()}
+              </span>
+            </p>
           </div>
 
-          {/* =================================================
-              SECURITY TEXT
-          ================================================== */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:from-blue-700 hover:to-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? "Verifying..." : "Verify & Continue"}
+            {!loading && <ArrowRight className="h-4 w-4" />}
+          </button>
 
-          <p className="mt-4 text-center text-[11px] leading-4 text-slate-400 sm:mt-5">
-            🔒 This area is restricted to authorized administrators.
+          <div className="flex flex-col items-center gap-4">
+            <button
+              type="button"
+              onClick={handleResendOTP}
+              disabled={loading || seconds > 0}
+              className="text-sm font-semibold text-blue-600 transition hover:text-blue-800 disabled:cursor-not-allowed disabled:text-slate-400"
+            >
+              {seconds > 0
+                ? `Resend code in ${seconds}s`
+                : "Resend verification code"}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleChangeEmail}
+              disabled={loading}
+              className="text-sm text-slate-500 transition hover:text-slate-800"
+            >
+              Use a different email address
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Bottom security notice */}
+      <div className="mt-8 border-t border-slate-100 pt-5">
+        <div className="flex items-start justify-center gap-2 text-center">
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+
+          <p className="text-xs leading-5 text-slate-500">
+            Your admin access is protected by email verification.
+            Never share your one-time code with anyone.
           </p>
-
         </div>
-      </section>
+      </div>
+    </div>
+
+    <p className="mt-5 text-center text-xs text-slate-400">
+      © 2026 Railway-AI · Secure Admin Portal
+    </p>
+  </div>
+</section>
+
+
     </main>
   );
 }

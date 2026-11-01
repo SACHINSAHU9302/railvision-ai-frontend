@@ -85,7 +85,7 @@ export default function LandingPage() {
           </p>
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
-            <Link href="/dashboard" className="w-full sm:w-auto">
+            <Link href="/register" className="w-full sm:w-auto">
               <Button size="lg" className="w-full sm:w-auto gap-2 text-sm font-semibold shadow-md">
                 <span>Get Started</span>
                 <ArrowRight className="w-4 h-4" />

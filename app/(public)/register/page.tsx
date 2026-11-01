@@ -32,49 +32,65 @@ export default function RegisterPage() {
   const [isSuccess, setIsSuccess] = React.useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrors({});
+  e.preventDefault();
+  setErrors({});
 
-    const nameErr = validateRequired(name, 'Full Name');
-    const emailErr = validateEmail(email);
-    const passErr = validatePassword(password);
-    let confirmErr: string | undefined;
+  const nameErr = validateRequired(name, 'Full Name');
+  const emailErr = validateEmail(email);
+  const passErr = validatePassword(password);
 
-    if (password !== confirmPassword) {
-      confirmErr = 'Passwords do not match.';
+  let confirmErr: string | undefined;
+
+  if (password !== confirmPassword) {
+    confirmErr = 'Passwords do not match.';
+  }
+
+  if (nameErr || emailErr || passErr || confirmErr) {
+    setErrors({
+      name: nameErr || undefined,
+      email: emailErr || undefined,
+      password: passErr || undefined,
+      confirmPassword: confirmErr,
+    });
+    return;
+  }
+
+  setIsLoading(true);
+
+  try {
+    const session = await registerUser({
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      password,
+      confirmPassword,
+    });
+
+    if (!session.isAuthenticated || !session.token) {
+      throw new Error(
+        'Account created, but automatic login failed. Please try logging in.',
+      );
     }
 
-    if (nameErr || emailErr || passErr || confirmErr) {
-      setErrors({
-        name: nameErr || undefined,
-        email: emailErr || undefined,
-        password: passErr || undefined,
-        confirmPassword: confirmErr,
-      });
-      return;
-    }
+    setIsSuccess(true);
 
-    setIsLoading(true);
-    try {
-      await registerUser({ name, email, password, confirmPassword });
-      setIsSuccess(true);
-      toast({
-        title: 'Account Registered',
-        description: 'Your passenger profile has been created.',
-        type: 'success',
-      });
-      setTimeout(() => {
-        router.push('/dashboard');
-      }, 700);
-    } catch (err) {
-      setErrors({
-        general: err instanceof Error ? err.message : 'Registration failed. Please try again.',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    toast({
+      title: 'Account Created Successfully',
+      description: `Welcome to RailVision AI, ${session.user?.name || name}!`,
+      type: 'success',
+    });
 
+    router.replace('/dashboard');
+  } catch (err) {
+    setErrors({
+      general:
+        err instanceof Error
+          ? err.message
+          : 'Registration failed. Please try again.',
+    });
+  } finally {
+    setIsLoading(false);
+  }
+};
   return (
     <div className="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-slate-50 dark:bg-[#0a0f1d] px-4">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center mb-6">

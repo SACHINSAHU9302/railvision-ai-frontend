@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Search,
   Plus,
@@ -46,212 +46,7 @@ interface Platform {
   verificationStatus: VerificationStatus;
 }
 
-const initialPlatforms: Platform[] = [
-  {
-    id: 1,
-    platformId: "BPL-P01",
-    stationCode: "BPL",
-    platformNumber: 1,
-    latitude: "23.2599",
-    longitude: "77.4126",
-    shelter: true,
-    bench: true,
-    drinkingWater: true,
-    toilet: true,
-    fobAccess: true,
-    liftAccess: true,
-    escalatorAccess: true,
-    wheelchairAccess: true,
-    verificationStatus: "Verified",
-  },
-  {
-    id: 2,
-    platformId: "BPL-P02",
-    stationCode: "BPL",
-    platformNumber: 2,
-    latitude: "23.2602",
-    longitude: "77.4129",
-    shelter: true,
-    bench: true,
-    drinkingWater: true,
-    toilet: true,
-    fobAccess: true,
-    liftAccess: true,
-    escalatorAccess: false,
-    wheelchairAccess: true,
-    verificationStatus: "Verified",
-  },
-  {
-    id: 3,
-    platformId: "BPL-P03",
-    stationCode: "BPL",
-    platformNumber: 3,
-    latitude: "23.2605",
-    longitude: "77.4132",
-    shelter: true,
-    bench: true,
-    drinkingWater: true,
-    toilet: false,
-    fobAccess: true,
-    liftAccess: true,
-    escalatorAccess: false,
-    wheelchairAccess: true,
-    verificationStatus: "Pending",
-  },
-  {
-    id: 4,
-    platformId: "RKMP-P01",
-    stationCode: "RKMP",
-    platformNumber: 1,
-    latitude: "23.2350",
-    longitude: "77.4340",
-    shelter: true,
-    bench: true,
-    drinkingWater: true,
-    toilet: true,
-    fobAccess: true,
-    liftAccess: true,
-    escalatorAccess: true,
-    wheelchairAccess: true,
-    verificationStatus: "Verified",
-  },
-  {
-    id: 5,
-    platformId: "RKMP-P02",
-    stationCode: "RKMP",
-    platformNumber: 2,
-    latitude: "23.2353",
-    longitude: "77.4343",
-    shelter: true,
-    bench: true,
-    drinkingWater: true,
-    toilet: true,
-    fobAccess: true,
-    liftAccess: true,
-    escalatorAccess: true,
-    wheelchairAccess: true,
-    verificationStatus: "Verified",
-  },
-  {
-    id: 6,
-    platformId: "INDB-P01",
-    stationCode: "INDB",
-    platformNumber: 1,
-    latitude: "22.7196",
-    longitude: "75.8577",
-    shelter: true,
-    bench: true,
-    drinkingWater: true,
-    toilet: true,
-    fobAccess: true,
-    liftAccess: true,
-    escalatorAccess: true,
-    wheelchairAccess: true,
-    verificationStatus: "Verified",
-  },
-  {
-    id: 7,
-    platformId: "INDB-P02",
-    stationCode: "INDB",
-    platformNumber: 2,
-    latitude: "22.7200",
-    longitude: "75.8580",
-    shelter: true,
-    bench: true,
-    drinkingWater: true,
-    toilet: true,
-    fobAccess: true,
-    liftAccess: true,
-    escalatorAccess: false,
-    wheelchairAccess: true,
-    verificationStatus: "Pending",
-  },
-  {
-    id: 8,
-    platformId: "UJN-P01",
-    stationCode: "UJN",
-    platformNumber: 1,
-    latitude: "23.1765",
-    longitude: "75.7885",
-    shelter: true,
-    bench: true,
-    drinkingWater: true,
-    toilet: true,
-    fobAccess: true,
-    liftAccess: true,
-    escalatorAccess: false,
-    wheelchairAccess: true,
-    verificationStatus: "Verified",
-  },
-  {
-    id: 9,
-    platformId: "UJN-P02",
-    stationCode: "UJN",
-    platformNumber: 2,
-    latitude: "23.1768",
-    longitude: "75.7889",
-    shelter: true,
-    bench: true,
-    drinkingWater: true,
-    toilet: false,
-    fobAccess: true,
-    liftAccess: false,
-    escalatorAccess: false,
-    wheelchairAccess: false,
-    verificationStatus: "Rejected",
-  },
-  {
-    id: 10,
-    platformId: "JBP-P01",
-    stationCode: "JBP",
-    platformNumber: 1,
-    latitude: "23.1600",
-    longitude: "79.9495",
-    shelter: true,
-    bench: true,
-    drinkingWater: true,
-    toilet: true,
-    fobAccess: true,
-    liftAccess: true,
-    escalatorAccess: true,
-    wheelchairAccess: true,
-    verificationStatus: "Verified",
-  },
-  {
-    id: 11,
-    platformId: "JBP-P02",
-    stationCode: "JBP",
-    platformNumber: 2,
-    latitude: "23.1604",
-    longitude: "79.9499",
-    shelter: true,
-    bench: true,
-    drinkingWater: true,
-    toilet: true,
-    fobAccess: true,
-    liftAccess: true,
-    escalatorAccess: false,
-    wheelchairAccess: true,
-    verificationStatus: "Verified",
-  },
-  {
-    id: 12,
-    platformId: "ET-P01",
-    stationCode: "ET",
-    platformNumber: 1,
-    latitude: "22.6140",
-    longitude: "77.7620",
-    shelter: true,
-    bench: true,
-    drinkingWater: true,
-    toilet: true,
-    fobAccess: true,
-    liftAccess: false,
-    escalatorAccess: false,
-    wheelchairAccess: true,
-    verificationStatus: "Pending",
-  },
-];
+const initialPlatforms: Platform[] = [];
 
 const emptyPlatform: Omit<Platform, "id"> = {
   platformId: "",
@@ -270,12 +65,41 @@ const emptyPlatform: Omit<Platform, "id"> = {
   verificationStatus: "Pending",
 };
 
+const PLATFORM_STORAGE_KEY = "railwayAdminPlatforms_v2";
+
 const inputClass =
   "w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100";
 
 export default function PlatformsPage() {
   const [platforms, setPlatforms] =
     useState<Platform[]>(initialPlatforms);
+  const [storageLoaded, setStorageLoaded] = useState(false);
+
+  // Load saved platform records once on the client.
+  useEffect(() => {
+    try {
+      const savedPlatforms = localStorage.getItem(PLATFORM_STORAGE_KEY);
+      if (savedPlatforms) {
+        const parsed = JSON.parse(savedPlatforms) as Platform[];
+        if (Array.isArray(parsed)) setPlatforms(parsed);
+      }
+    } catch (error) {
+      console.error("Unable to load saved platforms:", error);
+    } finally {
+      setStorageLoaded(true);
+    }
+  }, []);
+
+  // Persist every add, edit and delete after the initial load.
+  useEffect(() => {
+    if (!storageLoaded) return;
+    try {
+      localStorage.setItem(PLATFORM_STORAGE_KEY, JSON.stringify(platforms));
+    } catch (error) {
+      console.error("Unable to save platforms:", error);
+      alert("Platform data could not be saved in this browser.");
+    }
+  }, [platforms, storageLoaded]);
 
   const [search, setSearch] = useState("");
   const [stationFilter, setStationFilter] = useState("All");
@@ -382,19 +206,57 @@ export default function PlatformsPage() {
   ) => {
     e.preventDefault();
 
-    if (
-      !formData.platformId.trim() ||
-      !formData.stationCode.trim()
-    ) {
+    const platformId = formData.platformId.trim().toUpperCase();
+    const stationCode = formData.stationCode.trim().toUpperCase();
+    const latitude = formData.latitude.trim();
+    const longitude = formData.longitude.trim();
+
+    if (!platformId || !stationCode) {
+      alert("Platform ID and Station Code are required.");
       return;
     }
+
+    if (!Number.isInteger(formData.platformNumber) || formData.platformNumber < 1) {
+      alert("Platform Number must be a positive whole number.");
+      return;
+    }
+
+    if (latitude && (!Number.isFinite(Number(latitude)) || Number(latitude) < -90 || Number(latitude) > 90)) {
+      alert("Latitude must be a number between -90 and 90.");
+      return;
+    }
+
+    if (longitude && (!Number.isFinite(Number(longitude)) || Number(longitude) < -180 || Number(longitude) > 180)) {
+      alert("Longitude must be a number between -180 and 180.");
+      return;
+    }
+
+    const duplicate = platforms.some((platform) =>
+      platform.id !== editingPlatform?.id &&
+      (platform.platformId.toUpperCase() === platformId ||
+       (platform.stationCode.toUpperCase() === stationCode &&
+        platform.platformNumber === formData.platformNumber))
+    );
+
+    if (duplicate) {
+      alert("This Platform ID or station-wise platform number already exists.");
+      return;
+    }
+
+    const normalizedFormData = {
+      ...formData,
+      platformId,
+      stationCode,
+      latitude,
+      longitude,
+    };
 
     if (editingPlatform) {
       setPlatforms((current) =>
         current.map((platform) =>
           platform.id === editingPlatform.id
             ? {
-                ...formData,
+                ...normalizedFormData,
                 id: editingPlatform.id,
               }
             : platform
@@ -402,7 +264,7 @@ export default function PlatformsPage() {
       );
     } else {
       const newPlatform: Platform = {
-        ...formData,
+        ...normalizedFormData,
         id: Date.now(),
       };
 
@@ -1051,6 +913,10 @@ export default function PlatformsPage() {
                         e.target.value
                       )
                     }
+                    type="number"
+                    step="any"
+                    min="-90"
+                    max="90"
                     placeholder="e.g. 23.2599"
                     className={inputClass}
                   />
@@ -1065,6 +931,10 @@ export default function PlatformsPage() {
                         e.target.value
                       )
                     }
+                    type="number"
+                    step="any"
+                    min="-180"
+                    max="180"
                     placeholder="e.g. 77.4126"
                     className={inputClass}
                   />
