@@ -159,37 +159,7 @@ export default function AssistantPage() {
           </div>
         </div>
 
-        {/* System Architecture Collapsible Banner */}
-        <div className="rounded-lg border border-blue-200/70 dark:border-blue-900/60 bg-blue-50/40 dark:bg-blue-950/20 px-3 py-2 text-xs">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-medium">
-              <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-              <span>Agent Mode: Verified Source Document Grounding</span>
-            </div>
-            <button
-              onClick={() => setShowSystemDetails(!showSystemDetails)}
-              className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
-            >
-              <span>{showSystemDetails ? 'Hide details' : 'View grounding details'}</span>
-              <ChevronDown className={`w-3 h-3 transition-transform ${showSystemDetails ? 'rotate-180' : ''}`} />
-            </button>
-          </div>
-
-          {showSystemDetails && (
-            <div className="mt-2 pt-2 border-t border-blue-200/50 dark:border-blue-900/50 text-[11px] text-slate-600 dark:text-slate-400 space-y-1">
-              <p>
-                <strong>Navigation Agent:</strong> Resolves platform footprints, foot-over-bridge crossings, and lift coordinates.
-              </p>
-              <p>
-                <strong>Document RAG Agent:</strong> Indexes Indian Railway Commercial Circulars (Refund Rules, Tatkal policies, Divyangjan quotas, Baggage norms).
-              </p>
-              <p>
-                <strong>Complaint Triage Agent:</strong> Classifies station cleanliness and electrical defects with platform-level tracking.
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
+       </div>
 
       {/* Messages Scroll Area */}
       <div className="flex-1 overflow-y-auto px-1 py-4 space-y-4 scroll-smooth">

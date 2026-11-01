@@ -251,38 +251,46 @@ export async function getDocuments(
 /* =========================================================
    GET document by ID
 ========================================================= */
-
 export async function getDocumentById(
   id: string
 ): Promise<RailwayDocument | null> {
-  if (isDemoMode()) {
-    await new Promise((resolve) => setTimeout(resolve, 150));
-
-    return (
-      DEMO_DOCUMENTS.find(
-        (doc) => String(doc.id) === String(id)
-      ) ?? null
-    );
-  }
-
   // Decode the ID safely.
   let decodedId = id;
 
   try {
     decodedId = decodeURIComponent(id);
   } catch {
-    decodedId = id;
+    // Keep the original ID if decoding fails.
   }
 
-  // Load documents from the backend.
+  // Demo mode lookup.
+  if (isDemoMode()) {
+    return (
+      DEMO_DOCUMENTS.find((doc) => {
+        const currentId = String(doc.id);
+
+        return (
+          currentId === id ||
+          currentId === decodedId ||
+          encodeURIComponent(currentId) === id
+        );
+      }) ?? null
+    );
+  }
+
+  // Fetch documents from the backend.
   const documents = await getDocuments();
 
-  // Match the exact backend document ID.
-  const found = documents.find(
-    (doc) =>
-      String(doc.id) === id ||
-      String(doc.id) === decodedId
-  );
+  // Match encoded and decoded document IDs.
+  const found = documents.find((doc) => {
+    const currentId = String(doc.id);
+
+    return (
+      currentId === id ||
+      currentId === decodedId ||
+      encodeURIComponent(currentId) === id
+    );
+  });
 
   return found ?? null;
 }

@@ -28,17 +28,91 @@ interface BackendUser {
   id: number;
   username: string;
   email: string;
+  name?: string;
   first_name?: string;
   last_name?: string;
   date_joined?: string;
+  is_staff?: boolean;
 }
 
-interface RegisterResponse {
+interface BackendProfile {
+  phone?: string;
+  role?: string;
+  status?: string;
+  location?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface BackendProfileResponse {
   success: boolean;
-  message: string;
-  access: string;
-  refresh: string;
   user: BackendUser;
+  profile: BackendProfile;
+}
+
+// Fetch the logged-in user's Django profile.
+export async function getCurrentUser(
+  accessToken: string,
+): Promise<User> {
+  if (!API_URL) {
+    throw new Error(
+      'API URL is not configured. Check NEXT_PUBLIC_API_URL.',
+    );
+  }
+
+  const response = await fetch(`${API_URL}/api/auth/profile/`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    cache: 'no-store',
+  });
+
+  const data = await parseResponse<BackendProfileResponse>(response);
+
+  if (!data.user) {
+    throw new Error('User information was not returned by the backend.');
+  }
+
+  const backendUser = data.user;
+  const profile = data.profile ?? {};
+
+  const fullName =
+    backendUser.name ||
+    `${backendUser.first_name ?? ''} ${backendUser.last_name ?? ''}`.trim() ||
+    backendUser.username ||
+    backendUser.email;
+
+  const backendRole = (profile.role || 'Passenger').toLowerCase();
+
+  let role: User['role'] = 'passenger';
+
+  if (backendRole === 'admin' || backendUser.is_staff) {
+    role = 'admin';
+  } else if (
+    backendRole === 'station manager' ||
+    backendRole === 'station_manager' ||
+    backendRole === 'support agent'
+  ) {
+    role = 'station_staff';
+  }
+
+  return {
+    id: String(backendUser.id),
+    name: fullName,
+    username: backendUser.username,
+    email: backendUser.email,
+    role,
+    phone: profile.phone ?? '',
+    status: profile.status ?? 'Active',
+    location: profile.location ?? '',
+    createdAt:
+      profile.created_at ||
+      backendUser.date_joined ||
+      new Date().toISOString(),
+    updatedAt: profile.updated_at,
+  };
 }
 
 async function parseResponse<T>(response: Response): Promise<T> {
@@ -147,7 +221,7 @@ export async function registerUser(
     }),
   });
 
-  const data = await parseResponse<RegisterResponse>(response);
+  const data = await parseResponse<AuthTokenResponse>(response);
 
   if (!data.access || !data.refresh) {
     throw new Error(
@@ -221,41 +295,6 @@ export async function loginUser(
     logoutUser();
     throw error;
   }
-}
-
-// Fetch the logged-in user's Django profile.
-export async function getCurrentUser(
-  accessToken: string,
-): Promise<User> {
-  if (!API_URL) {
-    throw new Error(
-      'API URL is not configured. Check NEXT_PUBLIC_API_URL.',
-    );
-  }
-
-  const response = await fetch(`${API_URL}/api/auth/profile/`, {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    cache: 'no-store',
-  });
-
-  const data = await parseResponse<BackendUser>(response);
-
-  const fullName =
-    `${data.first_name ?? ''} ${data.last_name ?? ''}`.trim() ||
-    data.username ||
-    data.email;
-
-  return {
-    id: String(data.id),
-    name: fullName,
-    email: data.email,
-    role: 'passenger',
-    createdAt: data.date_joined ?? new Date().toISOString(),
-  };
 }
 
 // Demo session helper.

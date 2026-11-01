@@ -4,11 +4,15 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  username?: string;
   role: UserRole;
+  status?: string;
+  location?: string;
   avatarUrl?: string;
   phone?: string;
   preferredLanguage?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface LoginCredentials {

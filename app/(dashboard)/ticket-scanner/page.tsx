@@ -2,326 +2,766 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+
 import { FileUpload } from '@/components/ui/file-upload';
 import { Breadcrumb } from '@/components/ui/breadcrumb';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { scanTicketFile, fetchTicketDetails } from '@/lib/api/ticket';
-import { ExtractedTicket } from '@/types/ticket';
+
+import {
+  scanTicketFile,
+  fetchTicketDetails,
+} from '@/lib/api/ticket';
+
+import type { ExtractedTicket } from '@/types/ticket';
+
 import { useToast } from '@/hooks/use-toast';
+
 import {
   ScanLine,
-  Train,
   Clock,
   Compass,
   Bot,
-  CheckCircle2,
   AlertCircle,
   FileText,
   Search,
   RefreshCw,
-  Sparkles,
+  Train,
+  CheckCircle2,
+  User,
+  Ticket,
 } from 'lucide-react';
 
 export default function TicketScannerPage() {
-  const router = useRouter();
   const { toast } = useToast();
 
-  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const [manualPnr, setManualPnr] = React.useState('');
-  const [isProcessing, setIsProcessing] = React.useState(false);
-  const [processingStep, setProcessingStep] = React.useState<string>('');
-  const [extractedTicket, setExtractedTicket] = React.useState<ExtractedTicket | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
+  const [selectedFile, setSelectedFile] =
+    React.useState<File | null>(null);
 
-  const handleFileUpload = async (file: File) => {
+  const [manualPnr, setManualPnr] = React.useState('');
+
+  const [isProcessing, setIsProcessing] =
+    React.useState(false);
+
+  const [processingStep, setProcessingStep] =
+    React.useState('');
+
+  const [extractedTicket, setExtractedTicket] =
+    React.useState<ExtractedTicket | null>(null);
+
+  const [error, setError] =
+    React.useState<string | null>(null);
+
+  // ==========================================
+  // 1. TICKET PDF / IMAGE UPLOAD
+  // ==========================================
+
+  const handleFileUpload = async (file: File | null) => {
+    if (!file) return;
+
     setSelectedFile(file);
     setError(null);
+    setExtractedTicket(null);
     setIsProcessing(true);
 
     try {
-      setProcessingStep('Validating and uploading ticket image...');
-      await new Promise((r) => setTimeout(r, 600));
+      setProcessingStep('Validating ticket file...');
 
-      setProcessingStep('Scanning document boundaries & optical text recognition (OCR)...');
-      await new Promise((r) => setTimeout(r, 700));
+      const allowedTypes = [
+        'application/pdf',
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+      ];
 
-      setProcessingStep('Extracting PNR, train schedule, and coach allocation...');
+      if (!allowedTypes.includes(file.type)) {
+        throw new Error(
+          'Please upload a PDF, JPG, PNG or WEBP file.'
+        );
+      }
+
+      if (file.size === 0) {
+        throw new Error('Selected file is empty.');
+      }
+
+      if (file.size > 10 * 1024 * 1024) {
+        throw new Error('File size must be less than 10 MB.');
+      }
+
+      setProcessingStep('Uploading ticket to Django backend...');
+
       const ticket = await scanTicketFile(file);
 
-      setProcessingStep('Cross-referencing station concourse & platform schematics...');
-      await new Promise((r) => setTimeout(r, 500));
+      setProcessingStep('Processing extracted ticket information...');
 
       setExtractedTicket(ticket);
+
       toast({
-        title: 'Ticket OCR Complete',
-        description: `Recognized PNR: ${ticket.pnrNumber} (${ticket.trainName})`,
+        title: 'Ticket Uploaded Successfully',
+        description: ticket.pnrNumber
+          ? `PNR detected: ${ticket.pnrNumber}`
+          : 'PDF uploaded and text extraction completed.',
         type: 'success',
       });
+
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to parse ticket. Please try manual entry.');
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Unable to process ticket.';
+
+      setError(message);
+
+      toast({
+        title: 'Ticket Upload Failed',
+        description: message,
+        type: 'error',
+      });
+
     } finally {
       setIsProcessing(false);
       setProcessingStep('');
     }
   };
 
-  const handleManualLookup = async (e: React.FormEvent) => {
+  // ==========================================
+  // 2. MANUAL PNR VALIDATION
+  // ==========================================
+
+  const handleManualLookup = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
     e.preventDefault();
-    if (!manualPnr.trim()) return;
+
+    const pnr = manualPnr.trim();
+
+    if (!/^\d{10}$/.test(pnr)) {
+      setError('Please enter a valid 10-digit PNR number.');
+      return;
+    }
+
     setError(null);
+    setExtractedTicket(null);
     setIsProcessing(true);
 
     try {
-      setProcessingStep('Querying PNR reservation system...');
-      const ticket = await fetchTicketDetails(manualPnr.trim());
+      setProcessingStep('Validating PNR number...');
+
+      const ticket = await fetchTicketDetails(pnr);
+
       setExtractedTicket(ticket);
+
       toast({
-        title: 'PNR Retrieved',
-        description: `Train: ${ticket.trainNumber} • Platform ${ticket.platform}`,
+        title: 'PNR Format Validated',
+        description: `PNR: ${pnr}`,
         type: 'success',
       });
+
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'PNR query failed.');
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'PNR validation failed.';
+
+      setError(message);
+
+      toast({
+        title: 'PNR Validation Failed',
+        description: message,
+        type: 'error',
+      });
+
     } finally {
       setIsProcessing(false);
       setProcessingStep('');
     }
   };
+
+  // ==========================================
+  // 3. RESET SCANNER
+  // ==========================================
 
   const handleReset = () => {
     setSelectedFile(null);
     setManualPnr('');
     setExtractedTicket(null);
     setError(null);
+    setProcessingStep('');
   };
 
-  return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      <Breadcrumb items={[{ label: 'Ticket Scanner & PNR OCR' }]} />
+  // ==========================================
+  // 4. RESULT DISPLAY
+  // ==========================================
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200 dark:border-slate-800">
+  const ticket = extractedTicket;
+
+  const hasTrainDetails = Boolean(
+    ticket?.trainName || ticket?.trainNumber
+  );
+
+  const hasPlatform = Boolean(ticket?.platform);
+
+  const hasCoach = Boolean(ticket?.coach);
+
+  return (
+    <div className="space-y-6 max-w-5xl mx-auto">
+
+      {/* Breadcrumb */}
+
+      <Breadcrumb
+        items={[
+          { label: 'Ticket Scanner & PNR OCR' },
+        ]}
+      />
+
+      {/* Page Header */}
+
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b">
+
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <ScanLine className="w-6 h-6 text-[#0B2545] dark:text-blue-400" />
-            <span>Ticket Scanner &amp; Journey Navigator</span>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+
+            <ScanLine className="w-6 h-6 text-blue-600" />
+
+            Ticket Scanner & Journey Navigator
+
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Upload e-Ticket PDF or image (IRCTC UTS/PRS) for instant platform and coach navigation.
+
+          <p className="text-sm text-slate-500 mt-2">
+            Upload your railway ticket PDF or image to extract
+            ticket information.
           </p>
         </div>
 
-        {extractedTicket && (
-          <Button variant="outline" size="sm" onClick={handleReset} className="gap-1.5 text-xs">
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Scan Another Ticket</span>
+        {ticket && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleReset}
+            className="gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Scan Another Ticket
           </Button>
         )}
+
       </div>
 
+      {/* Error Message */}
+
       {error && (
-        <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 text-xs text-rose-800 dark:text-rose-300 flex items-center gap-3">
+        <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 text-sm text-rose-700 dark:text-rose-300 flex items-center gap-3">
+
           <AlertCircle className="w-5 h-5 shrink-0" />
+
           <span>{error}</span>
+
         </div>
       )}
 
-      {/* Processing State with Simulated Realistic Steps */}
+      {/* Processing */}
+
       {isProcessing && (
         <Card className="p-8 text-center space-y-4">
-          <div className="w-14 h-14 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900 flex items-center justify-center text-blue-600 dark:text-blue-400 mx-auto animate-spin">
-            <RefreshCw className="w-7 h-7" />
+
+          <div className="w-14 h-14 rounded-full bg-blue-50 dark:bg-blue-950 flex items-center justify-center mx-auto animate-spin">
+
+            <RefreshCw className="w-7 h-7 text-blue-600" />
+
           </div>
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-            Processing Ticket Document
+
+          <h3 className="font-semibold text-slate-900 dark:text-white">
+            Processing Ticket
           </h3>
-          <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-            {processingStep || 'Analyzing ticket data...'}
+
+          <p className="text-sm text-blue-600">
+            {processingStep}
           </p>
-          <div className="w-64 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full mx-auto overflow-hidden">
-            <div className="w-2/3 h-full bg-blue-600 rounded-full animate-pulse" />
+
+          <div className="w-64 h-2 bg-slate-100 dark:bg-slate-800 rounded-full mx-auto overflow-hidden">
+
+            <div className="w-2/3 h-full bg-blue-600 animate-pulse" />
+
           </div>
+
         </Card>
       )}
 
-      {/* Result Display if Extracted */}
-      {!isProcessing && extractedTicket && (
-        <div className="space-y-6 animate-in fade-in duration-300">
-          <Card className="overflow-hidden border-blue-200/80 dark:border-blue-900">
-            {/* Header Banner */}
-            <div className="bg-[#0B2545] text-white p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <span className="text-[11px] font-semibold text-blue-200 uppercase tracking-wider">
-                  Recognized e-Ticket Details
-                </span>
-                <h3 className="text-base font-bold text-white mt-0.5">
-                  {extractedTicket.trainNumber} • {extractedTicket.trainName}
-                </h3>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="success" size="sm" className="bg-emerald-500/20 text-emerald-100 border-emerald-400/40">
-                  {extractedTicket.status}
-                </Badge>
-                <span className="text-xs font-mono text-blue-200 bg-blue-900/60 px-2 py-1 rounded">
-                  PNR: {extractedTicket.pnrNumber}
-                </span>
-              </div>
-            </div>
+      {/* ==========================================
+          UPLOAD SECTION
+      ========================================== */}
 
-            <CardContent className="p-6 space-y-6">
-              {/* Origin -> Destination Route */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-5 border-b border-slate-100 dark:border-slate-800">
-                <div>
-                  <p className="text-[11px] uppercase font-semibold text-slate-400">Boarding Origin</p>
-                  <p className="text-base font-bold text-slate-900 dark:text-slate-100 mt-0.5">
-                    {extractedTicket.fromStation} ({extractedTicket.fromStationCode})
-                  </p>
-                  <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Departure: {extractedTicket.departureTime} • {extractedTicket.date}</span>
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] uppercase font-semibold text-slate-400">Destination</p>
-                  <p className="text-base font-bold text-slate-900 dark:text-slate-100 mt-0.5">
-                    {extractedTicket.toStation} ({extractedTicket.toStationCode})
-                  </p>
-                  <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Arrival: {extractedTicket.arrivalTime}</span>
-                  </p>
-                </div>
-              </div>
-
-              {/* Passenger Berth & Platform Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="p-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/60">
-                  <p className="text-[10px] uppercase font-semibold text-blue-600 dark:text-blue-300">
-                    Departure Platform
-                  </p>
-                  <p className="text-xl font-extrabold text-[#0B2545] dark:text-blue-400 mt-0.5">
-                    Platform {extractedTicket.platform}
-                  </p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">At {extractedTicket.fromStationCode}</p>
-                </div>
-
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800">
-                  <p className="text-[10px] uppercase font-semibold text-slate-400">Coach / Berth</p>
-                  <p className="text-lg font-bold text-slate-900 dark:text-slate-100 mt-0.5">
-                    {extractedTicket.coach} / {extractedTicket.berth}
-                  </p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Berth Type: {extractedTicket.berthType}</p>
-                </div>
-
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800">
-                  <p className="text-[10px] uppercase font-semibold text-slate-400">Travel Class</p>
-                  <p className="text-base font-bold text-slate-900 dark:text-slate-100 mt-0.5">
-                    {extractedTicket.travelClass}
-                  </p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Quota: {extractedTicket.quota}</p>
-                </div>
-
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800">
-                  <p className="text-[10px] uppercase font-semibold text-slate-400">Passenger</p>
-                  <p className="text-xs font-bold text-slate-900 dark:text-slate-100 mt-1 truncate">
-                    {extractedTicket.passengerName}
-                  </p>
-                  <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
-                    {extractedTicket.status}
-                  </p>
-                </div>
-              </div>
-
-              {/* Suggested Actions */}
-              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-3">
-                <Link href={`/navigation/ndls`} className="flex-1 min-w-[200px]">
-                  <Button size="md" className="w-full gap-2">
-                    <Compass className="w-4 h-4" />
-                    <span>Navigate Platform {extractedTicket.platform} Layout</span>
-                  </Button>
-                </Link>
-
-                <Link
-                  href={`/assistant?q=Find%20Coach%20${extractedTicket.coach}%20position%20for%20train%20${extractedTicket.trainNumber}`}
-                  className="flex-1 min-w-[200px]"
-                >
-                  <Button variant="secondary" size="md" className="w-full gap-2">
-                    <Bot className="w-4 h-4" />
-                    <span>Coach {extractedTicket.coach} Position &amp; Rules</span>
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Upload Zone & Manual PNR Input (Shown when not extracted yet) */}
-      {!isProcessing && !extractedTicket && (
+      {!isProcessing && !ticket && (
         <div className="space-y-6">
+
           <Card className="p-6">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-2 flex items-center gap-2">
-              <FileText className="w-4 h-4 text-blue-600" />
-              <span>Option 1: Upload Ticket Image or PDF</span>
+
+            <h3 className="font-bold flex items-center gap-2 mb-2">
+
+              <FileText className="w-5 h-5 text-blue-600" />
+
+              Option 1: Upload Railway Ticket
+
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-              Supported formats: JPG, PNG, PDF (IRCTC e-Ticket screenshot, UTS mobile QR, or printed reservation slip).
+
+            <p className="text-sm text-slate-500 mb-5">
+              Supported formats: PDF, JPG, PNG and WEBP.
+              Maximum file size: 10 MB.
             </p>
 
             <FileUpload
+              selectedFile={selectedFile}
               onFileSelect={handleFileUpload}
               accept=".pdf,image/png,image/jpeg,image/webp"
               maxSizeMB={10}
             />
 
-            {/* Demo Sample Ticket Button */}
-            <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
-              <span>Need a test file?</span>
-              <button
-                type="button"
-                onClick={() => {
-                  const demoFile = new File(['fake-ticket-blob'], 'irctc_eticket_2847193021.pdf', {
-                    type: 'application/pdf',
-                  });
-                  handleFileUpload(demoFile);
-                }}
-                className="text-blue-600 dark:text-blue-400 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Test with Sample Rajdhani e-Ticket</span>
-              </button>
-            </div>
+            {selectedFile && (
+              <div className="mt-3 text-xs text-slate-500">
+                Selected file: {selectedFile.name}
+              </div>
+            )}
+
           </Card>
+
+          {/* Manual PNR */}
 
           <Card className="p-6">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-2 flex items-center gap-2">
-              <Search className="w-4 h-4 text-blue-600" />
-              <span>Option 2: Enter 10-Digit PNR Number</span>
+
+            <h3 className="font-bold flex items-center gap-2 mb-2">
+
+              <Search className="w-5 h-5 text-blue-600" />
+
+              Option 2: Manual PNR Validation
+
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-              If you don&apos;t have a ticket image file handy, enter your reservation PNR number directly.
+
+            <p className="text-sm text-slate-500 mb-4">
+              Enter your 10-digit railway PNR number.
             </p>
 
-            <form onSubmit={handleManualLookup} className="flex flex-col sm:flex-row gap-3">
+            <form
+              onSubmit={handleManualLookup}
+              className="flex flex-col sm:flex-row gap-3"
+            >
+
               <div className="flex-1">
+
                 <Input
                   value={manualPnr}
-                  onChange={(e) => setManualPnr(e.target.value)}
-                  placeholder="e.g. 2847193021"
+                  onChange={(e) => {
+                    setManualPnr(
+                      e.target.value.replace(/\D/g, '').slice(0, 10)
+                    );
+                  }}
+                  placeholder="Enter 10-digit PNR"
                   maxLength={10}
-                  className="font-mono text-sm tracking-widest"
+                  inputMode="numeric"
+                  className="font-mono tracking-widest"
                 />
+
               </div>
-              <Button type="submit" size="md" disabled={!manualPnr.trim()} className="gap-2">
-                <span>Fetch PNR Details</span>
+
+              <Button
+                type="submit"
+                disabled={
+                  manualPnr.length !== 10 || isProcessing
+                }
+                className="gap-2"
+              >
+
+                <Search className="w-4 h-4" />
+
+                Validate PNR
+
               </Button>
+
             </form>
+
+            <p className="text-xs text-amber-600 mt-3">
+              Note: This currently validates PNR format only.
+              It does not retrieve live railway reservation details.
+            </p>
+
           </Card>
+
         </div>
       )}
+
+      {/* ==========================================
+          EXTRACTED TICKET RESULT
+      ========================================== */}
+
+      {!isProcessing && ticket && (
+
+        <div className="space-y-6">
+
+          {/* Main Ticket Card */}
+
+          <Card className="overflow-hidden border-blue-200 dark:border-blue-900">
+
+            {/* Header */}
+
+            <div className="bg-[#0B2545] text-white p-5">
+
+              <div className="flex flex-col sm:flex-row justify-between gap-3">
+
+                <div>
+
+                  <p className="text-xs text-blue-200 uppercase font-semibold tracking-wider">
+
+                    Recognized E-Ticket Details
+
+                  </p>
+
+                  <h2 className="text-lg font-bold mt-2">
+
+                    {ticket.trainName || 'Train Details Not Extracted'}
+
+                  </h2>
+
+                  {ticket.trainNumber && (
+                    <p className="text-sm text-blue-200">
+                      Train Number: {ticket.trainNumber}
+                    </p>
+                  )}
+
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+
+                  <Badge
+                    variant="success"
+                    size="sm"
+                  >
+                    {ticket.status || 'Text Extracted'}
+                  </Badge>
+
+                  <span className="text-xs font-mono bg-blue-900 px-3 py-2 rounded">
+
+                    PNR: {ticket.pnrNumber || 'Not Found'}
+
+                  </span>
+
+                </div>
+
+              </div>
+
+            </div>
+
+            <CardContent className="p-6 space-y-6">
+
+              {/* Extraction Status */}
+
+              <div className="flex items-center gap-2 text-sm text-emerald-600">
+
+                <CheckCircle2 className="w-5 h-5" />
+
+                PDF text extraction completed.
+
+              </div>
+
+              {/* Route Information */}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pb-5 border-b">
+
+                <div>
+
+                  <p className="text-xs uppercase font-semibold text-slate-400">
+                    Boarding Origin
+                  </p>
+
+                  <p className="text-base font-bold mt-1">
+
+                    {ticket.fromStation || 'Not extracted yet'}
+
+                    {ticket.fromStationCode
+                      ? ` (${ticket.fromStationCode})`
+                      : ''}
+
+                  </p>
+
+                  <p className="text-xs text-slate-500 mt-2 flex items-center gap-2">
+
+                    <Clock className="w-4 h-4" />
+
+                    Departure: {ticket.departureTime || 'Not available'}
+
+                  </p>
+
+                </div>
+
+                <div>
+
+                  <p className="text-xs uppercase font-semibold text-slate-400">
+                    Destination
+                  </p>
+
+                  <p className="text-base font-bold mt-1">
+
+                    {ticket.toStation || 'Not extracted yet'}
+
+                    {ticket.toStationCode
+                      ? ` (${ticket.toStationCode})`
+                      : ''}
+
+                  </p>
+
+                  <p className="text-xs text-slate-500 mt-2 flex items-center gap-2">
+
+                    <Clock className="w-4 h-4" />
+
+                    Arrival: {ticket.arrivalTime || 'Not available'}
+
+                  </p>
+
+                </div>
+
+              </div>
+
+              {/* Journey Information */}
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border">
+
+                  <p className="text-xs text-slate-500">
+                    Journey Date
+                  </p>
+
+                  <p className="font-bold mt-2 text-sm">
+                    {ticket.journeyDate || ticket.date || 'Not available'}
+                  </p>
+
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border">
+
+                  <p className="text-xs text-slate-500">
+                    Platform
+                  </p>
+
+                  <p className="font-bold mt-2">
+                    {ticket.platform || 'Pending'}
+                  </p>
+
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border">
+
+                  <p className="text-xs text-slate-500">
+                    Coach / Berth
+                  </p>
+
+                  <p className="font-bold mt-2">
+                    {ticket.coach || 'Pending'}
+                    {' / '}
+                    {ticket.berth || 'Pending'}
+                  </p>
+
+                  <p className="text-xs text-slate-500 mt-1">
+                    {ticket.berthType || 'Not available'}
+                  </p>
+
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border">
+
+                  <p className="text-xs text-slate-500">
+                    Travel Class
+                  </p>
+
+                  <p className="font-bold mt-2">
+                    {ticket.travelClass || 'Not available'}
+                  </p>
+
+                  <p className="text-xs text-slate-500 mt-1">
+                    Quota: {ticket.quota || 'Not available'}
+                  </p>
+
+                </div>
+
+              </div>
+
+              {/* Passenger Information */}
+
+              <div className="border rounded-xl p-4">
+
+                <h3 className="font-bold text-sm flex items-center gap-2 mb-3">
+
+                  <User className="w-4 h-4 text-blue-600" />
+
+                  Passenger Information
+
+                </h3>
+
+                {ticket.passengers && ticket.passengers.length > 0 ? (
+
+                  <div className="overflow-x-auto">
+
+                    <table className="w-full text-sm">
+
+                      <thead>
+                        <tr className="text-left border-b text-slate-500">
+
+                          <th className="p-2">Name</th>
+                          <th className="p-2">Age</th>
+                          <th className="p-2">Coach</th>
+                          <th className="p-2">Berth</th>
+                          <th className="p-2">Status</th>
+
+                        </tr>
+                      </thead>
+
+                      <tbody>
+
+                        {ticket.passengers.map((passenger, index) => (
+
+                          <tr key={index} className="border-b last:border-0">
+
+                            <td className="p-2">
+                              {passenger.name}
+                            </td>
+
+                            <td className="p-2">
+                              {passenger.age}
+                            </td>
+
+                            <td className="p-2">
+                              {passenger.coach || 'N/A'}
+                            </td>
+
+                            <td className="p-2">
+                              {passenger.berthNumber || 'N/A'}
+                            </td>
+
+                            <td className="p-2">
+                              {passenger.status}
+                            </td>
+
+                          </tr>
+
+                        ))}
+
+                      </tbody>
+
+                    </table>
+
+                  </div>
+
+                ) : (
+
+                  <p className="text-sm text-slate-500">
+                    Passenger information has not been extracted yet.
+                  </p>
+
+                )}
+
+              </div>
+
+              {/* Raw Extracted Text */}
+
+              {ticket.rawTextPreview && (
+
+                <div className="border rounded-xl p-4">
+
+                  <h3 className="font-bold text-sm flex items-center gap-2 mb-3">
+
+                    <FileText className="w-4 h-4 text-blue-600" />
+
+                    Extracted Ticket Text
+
+                  </h3>
+
+                  <pre className="text-xs whitespace-pre-wrap break-words text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900 rounded-lg p-4 max-h-72 overflow-y-auto">
+
+                    {ticket.rawTextPreview}
+
+                  </pre>
+
+                </div>
+
+              )}
+
+              {/* Navigation Actions */}
+
+              <div className="pt-4 border-t grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+                {hasPlatform ? (
+
+                  <Link
+                    href="/navigation/ndls"
+                    className="w-full"
+                  >
+
+                    <Button className="w-full gap-2">
+
+                      <Compass className="w-4 h-4" />
+
+                      Navigate Platform {ticket.platform}
+
+                    </Button>
+
+                  </Link>
+
+                ) : (
+
+                  <Button disabled className="w-full">
+
+                    Platform Details Pending
+
+                  </Button>
+
+                )}
+
+                {hasCoach ? (
+
+                  <Link
+                    href={`/assistant?q=${encodeURIComponent(
+                      `Find Coach ${ticket.coach} position for train ${ticket.trainNumber}`
+                    )}`}
+                    className="w-full"
+                  >
+
+                    <Button
+                      variant="secondary"
+                      className="w-full gap-2"
+                    >
+
+                      <Bot className="w-4 h-4" />
+
+                      Coach Position & Rules
+
+                    </Button>
+
+                  </Link>
+
+                ) : (
+
+                  <Button
+                    variant="secondary"
+                    disabled
+                    className="w-full"
+                  >
+
+                    Coach Details Pending
+
+                  </Button>
+
+                )}
+
+              </div>
+
+            </CardContent>
+
+          </Card>
+
+        </div>
+
+      )}
+
     </div>
   );
 }

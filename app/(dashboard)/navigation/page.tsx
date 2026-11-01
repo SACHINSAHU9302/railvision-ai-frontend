@@ -60,7 +60,9 @@ export default function NavigationPage() {
 
       </div>
 
-      {/* Station Directory */}
+    
+
+      {/* Main Grid */}
       {isLoading ? (
         <LoadingState message="Loading station directory..." />
       ) : error ? (

@@ -36,7 +36,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
   const { toast } = useToast();
-
+  const [showProfileDetails, setShowProfileDetails] = React.useState(false);
   const [user, setUser] = React.useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState('');
@@ -96,9 +96,9 @@ export default function ProfilePage() {
 
   const memberSince = user?.createdAt
     ? new Date(user.createdAt).toLocaleDateString('en-IN', {
-        month: 'short',
-        year: 'numeric',
-      })
+      month: 'short',
+      year: 'numeric',
+    })
     : 'Unknown';
 
   return (
@@ -124,11 +124,10 @@ export default function ProfilePage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => void loadProfile()}
-                className="gap-2"
+                onClick={() => setShowProfileDetails(true)}
+                className="text-xs"
               >
-                <RefreshCw className="w-4 h-4" />
-                Try Again
+                Profile Details
               </Button>
 
               <Button
@@ -358,6 +357,100 @@ export default function ProfilePage() {
           ))}
         </div>
       </Card>
+      {/* Profile Details Modal */}
+{showProfileDetails && user && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+
+    <div className="w-full max-w-lg rounded-xl bg-white dark:bg-slate-900 shadow-2xl">
+
+      {/* Modal Header */}
+      <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 p-5">
+
+        <div>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+            Profile Details
+          </h2>
+
+          <p className="text-xs text-slate-500 mt-1">
+            Your personal account information
+          </p>
+        </div>
+
+        <button
+          onClick={() => setShowProfileDetails(false)}
+          className="text-slate-500 hover:text-rose-500 text-xl"
+        >
+          ✕
+        </button>
+
+      </div>
+
+      {/* Profile Information */}
+      <div className="p-5 space-y-4">
+
+        <div className="flex items-center gap-4 mb-5">
+
+          <div className="w-14 h-14 rounded-full bg-[#0B2545] text-white flex items-center justify-center text-xl font-bold">
+            {user.name.charAt(0).toUpperCase()}
+          </div>
+
+          <div>
+            <h3 className="font-semibold text-slate-900 dark:text-white">
+              {user.name}
+            </h3>
+
+            <p className="text-sm text-slate-500">
+              {user.role.replace('_', ' ')}
+            </p>
+          </div>
+
+        </div>
+
+        {[
+          { label: 'Full Name', value: user.name },
+          { label: 'Username', value: user.username },
+          { label: 'Email Address', value: user.email },
+          { label: 'Phone Number', value: user.phone },
+          { label: 'Role', value: user.role.replace('_', ' ') },
+          { label: 'Account Status', value: user.status },
+          { label: 'Location', value: user.location },
+          { label: 'Member Since', value: memberSince },
+        ].map((item) => (
+
+          <div
+            key={item.label}
+            className="flex justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-3"
+          >
+
+            <span className="text-sm text-slate-500">
+              {item.label}
+            </span>
+
+            <span className="text-sm font-medium text-slate-900 dark:text-slate-100 text-right break-all">
+              {item.value || 'Not provided'}
+            </span>
+
+          </div>
+
+        ))}
+
+      </div>
+
+      {/* Modal Footer */}
+      <div className="border-t border-slate-200 dark:border-slate-700 p-4 flex justify-end">
+
+        <Button
+          onClick={() => setShowProfileDetails(false)}
+        >
+          Close
+        </Button>
+
+      </div>
+
+    </div>
+
+  </div>
+)}
     </div>
   );
 }

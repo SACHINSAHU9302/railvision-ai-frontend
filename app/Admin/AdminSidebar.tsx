@@ -69,16 +69,8 @@ const menuItems = [
     href: "/Admin/users",
     icon: Users,
   },
-  {
-    name: "AI Agents",
-    href: "/Admin/ai-agents",
-    icon: Bot,
-  },
-  {
-    name: "Settings",
-    href: "/Admin/settings",
-    icon: Settings,
-  },
+ 
+
 ];
 
 export default function AdminSidebar({
